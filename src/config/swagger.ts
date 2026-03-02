@@ -561,10 +561,6 @@ const options: swaggerJsdoc.Options = {
         name: 'Streaming',
         description: 'Anime streaming sources and episode endpoints',
       },
-      {
-        name: 'Health',
-        description: 'API health check endpoints',
-      },
     ],
   },
   apis: [
