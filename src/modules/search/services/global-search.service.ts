@@ -10,7 +10,8 @@ import type NovelSearchService from './novel-search.service';
 
 /**
  * Global Search Service
- * Orchestrates multi-domain search across anime, manga, and novel types using hybrid strategy
+ * Orchestrates multi-domain search across anime, manga, and novel types
+ * Each search service calls external API directly (no DB caching)
  */
 class GlobalSearchService {
   private animeSearchService: AnimeSearchService;
@@ -29,7 +30,7 @@ class GlobalSearchService {
 
   /**
    * Search across multiple media types in parallel
-   * Each search service implements hybrid strategy (DB → External API fallback)
+   * Each search service calls external API directly
    */
   async search(params: GlobalSearchParams): Promise<GlobalSearchResult> {
     const { q, types = ['all'], page = 1, perPage = 20 } = params;
