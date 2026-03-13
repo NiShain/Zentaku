@@ -2,7 +2,7 @@
  * User Entity
  */
 
-import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
+import { Column, Entity, JoinTable, ManyToMany, OneToMany, OneToOne } from 'typeorm';
 import type { Activity } from './Activity.entity';
 import { SoftDeletableEntity } from './base/SoftDeletableEntity';
 import type { ChannelParticipant } from './ChannelParticipant.entity';
@@ -15,6 +15,8 @@ import type { ListInvitation } from './ListInvitation.entity';
 import type { ListItem } from './ListItem.entity';
 import type { Message } from './Message.entity';
 import type { ProgressLog } from './ProgressLog.entity';
+import type { RefreshToken } from './RefreshToken.entity';
+import type { Role } from './Role.entity';
 import type { UserAuthentication } from './UserAuthentication.entity';
 import type { UserRelationship } from './UserRelationship.entity';
 import type { WatchRoomConfig } from './WatchRoomConfig.entity';
@@ -26,9 +28,6 @@ export class User extends SoftDeletableEntity {
 
   @Column({ type: 'varchar', length: 255, unique: true })
   email!: string;
-
-  @Column({ name: 'password_hash', type: 'varchar', length: 255 })
-  passwordHash!: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   avatar?: string | null;
@@ -142,4 +141,17 @@ export class User extends SoftDeletableEntity {
   // Authentication (1-1 relationship)
   @OneToOne('UserAuthentication', 'user')
   authentication!: UserAuthentication;
+
+  // Roles (many-to-many)
+  @ManyToMany('Role', 'users')
+  @JoinTable({
+    name: 'user_roles',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' },
+  })
+  roles!: Role[];
+
+  // Refresh Tokens (1-many)
+  @OneToMany('RefreshToken', 'user')
+  refreshTokens!: RefreshToken[];
 }

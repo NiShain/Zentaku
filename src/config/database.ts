@@ -16,7 +16,11 @@ export const AppDataSource = new DataSource({
   // All TypeORM entities
   entities: [
     entities.User,
+    entities.UserAuthentication,
     entities.UserRelationship,
+    entities.RefreshToken,
+    entities.Role,
+    entities.Permission,
     entities.MediaItem,
     entities.AnimeItem,
     entities.ReadingMediaItem,

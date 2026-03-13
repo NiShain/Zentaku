@@ -11,7 +11,13 @@ export * from './types/enums';
 
 // User
 export { User } from './User.entity';
+export { UserAuthentication } from './UserAuthentication.entity';
 export { UserRelationship } from './UserRelationship.entity';
+
+// Authentication & Authorization
+export { Permission } from './Permission.entity';
+export { RefreshToken } from './RefreshToken.entity';
+export { Role } from './Role.entity';
 
 // Media
 export { AnimeItem } from './AnimeItem.entity';
