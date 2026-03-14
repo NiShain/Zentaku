@@ -5,6 +5,7 @@ import type { User } from '../../../entities/User.entity';
 export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;
   findByUsername(username: string): Promise<User | null>;
+  create(data: Partial<User>): Promise<User>;
 }
 
 export class UserRepository extends BaseRepository<User> implements IUserRepository {

@@ -5,6 +5,7 @@ import type { RefreshToken } from '../../../entities/RefreshToken.entity';
 export interface IRefreshTokenRepository {
   findByToken(token: string): Promise<RefreshToken | null>;
   findByUserId(userId: number): Promise<RefreshToken[]>;
+  create(data: Partial<RefreshToken>): Promise<RefreshToken>;
   revokeToken(token: string): Promise<void>;
   revokeAllUserTokens(userId: number): Promise<void>;
   deleteExpiredTokens(): Promise<void>;

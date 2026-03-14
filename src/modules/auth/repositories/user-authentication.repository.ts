@@ -7,6 +7,11 @@ export interface IUserAuthenticationRepository {
   findByEmailVerificationToken(token: string): Promise<UserAuthentication | null>;
   findByPasswordResetToken(token: string): Promise<UserAuthentication | null>;
   createForUser(userId: number, passwordHash: string): Promise<UserAuthentication>;
+  create(data: Partial<UserAuthentication>): Promise<UserAuthentication>;
+  update(
+    id: number | bigint,
+    data: Partial<UserAuthentication>
+  ): Promise<UserAuthentication | null>;
   findWithUserByEmail(email: string): Promise<UserAuthentication | null>;
   findWithUserById(userId: number): Promise<UserAuthentication | null>;
   findByOAuthProvider(provider: string, providerId: string): Promise<UserAuthentication | null>;
