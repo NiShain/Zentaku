@@ -44,4 +44,6 @@ coverage/
 
 #plan
 plan/
-public/uploads/*
+
+# Ignore user uploaded media
+public/uploads/
