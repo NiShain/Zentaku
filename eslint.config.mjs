@@ -24,6 +24,7 @@ export default [
     rules: {
       // Disable base rule to use TypeScript version
       'no-unused-vars': 'off',
+      'no-undef': 'off',
 
       // TypeScript specific rules
       '@typescript-eslint/no-explicit-any': 'warn',

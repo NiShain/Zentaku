@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import multer from 'multer';
 import { AnilistAPIError, NotFoundError, ValidationError } from '../shared/utils/error';
 import logger from '../shared/utils/logger';
 
@@ -55,6 +56,22 @@ export const errorHandler = (
       error: {
         name: 'ValidationError',
         message: err.message,
+      },
+    });
+    return;
+  }
+
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'File is too large. Avatar must be < 2MB and banner must be < 5MB.'
+        : err.message;
+
+    res.status(400).json({
+      success: false,
+      error: {
+        name: 'MulterError',
+        message,
       },
     });
     return;

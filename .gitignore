@@ -41,3 +41,9 @@ coverage/
 # Temporary
 *.tmp
 .cache/
+
+#plan
+plan/
+
+# Ignore user uploaded media
+public/uploads/

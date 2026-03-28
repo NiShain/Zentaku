@@ -11,7 +11,6 @@ import type {
   Request,
   Response,
 } from 'express';
-import type { Buffer } from 'node:buffer';
 import type { ITokenPayload } from '../../modules/auth/types/auth.types';
 import type { PaginatedResult } from './common';
 
@@ -250,17 +249,7 @@ export interface ValidationErrorResponse {
 /**
  * File upload info
  */
-export interface UploadedFile {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  size: number;
-  destination: string;
-  filename: string;
-  path: string;
-  buffer?: Buffer;
-}
+export type UploadedFile = Express.Multer.File;
 
 /**
  * Request with file upload

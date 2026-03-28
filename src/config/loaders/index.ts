@@ -12,6 +12,7 @@ import animeLoader = require('./anime.loader');
 import readingMediaLoader = require('./reading-media.loader');
 import streamingLoader = require('./streaming.loader');
 import searchLoader = require('./search.loader');
+import userLoader = require('./user.loader');
 
 /**
  * Load all modules into the container
@@ -24,6 +25,8 @@ const loadModules = (container: Container): void => {
   infrastructureLoader(container);
 
   authLoader(container);
+
+  userLoader(container);
 
   animeLoader(container);
 
