@@ -393,33 +393,56 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
-        VideoSource: {
+        SubtitleTrack: {
           type: 'object',
           properties: {
             url: {
               type: 'string',
-              example: 'https://example.com/video.m3u8',
-            },
-            quality: {
-              type: 'string',
-              example: '1080p',
-            },
-            isM3U8: {
-              type: 'boolean',
-              example: true,
-            },
-          },
-        },
-        Subtitle: {
-          type: 'object',
-          properties: {
-            url: {
-              type: 'string',
-              example: 'https://example.com/subtitle.vtt',
+              example: 'https://example.com/subtitle.vi.vtt',
             },
             lang: {
               type: 'string',
-              example: 'English',
+              example: 'vi',
+            },
+          },
+        },
+        EpisodeSourcesData: {
+          type: 'object',
+          properties: {
+            streamLinks: {
+              type: 'array',
+              items: {
+                type: 'string',
+                example: 'https://example.com/video.m3u8',
+              },
+            },
+            subtitles: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/SubtitleTrack',
+              },
+            },
+            capturedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-03-25T10:10:10Z',
+            },
+            upstreamEpisodeId: {
+              type: 'string',
+              example: '123456',
+            },
+            meta: {
+              type: 'object',
+              properties: {
+                refreshed: {
+                  type: 'boolean',
+                  example: false,
+                },
+                source: {
+                  type: 'string',
+                  example: 'mysql_cache',
+                },
+              },
             },
           },
         },
@@ -445,60 +468,87 @@ const options: swaggerJsdoc.Options = {
                   type: 'string',
                   example: 'one-piece-100',
                 },
-                headers: {
-                  type: 'object',
-                  properties: {
-                    Referer: {
-                      type: 'string',
-                      example: 'https://hianime.to',
-                    },
-                    'User-Agent': {
-                      type: 'string',
-                      example: 'Mozilla/5.0',
-                    },
-                  },
-                },
-                sources: {
-                  type: 'array',
-                  items: {
-                    $ref: '#/components/schemas/VideoSource',
-                  },
-                },
-                subtitles: {
-                  type: 'array',
-                  items: {
-                    $ref: '#/components/schemas/Subtitle',
-                  },
-                },
-                download: {
+                status: {
                   type: 'string',
-                  example: 'https://example.com/download',
+                  enum: ['success'],
+                  example: 'success',
                 },
-                intro: {
+                data: {
+                  $ref: '#/components/schemas/EpisodeSourcesData',
+                },
+              },
+            },
+          },
+        },
+        EpisodeSourcesPendingResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            data: {
+              type: 'object',
+              properties: {
+                anilistId: {
+                  type: 'integer',
+                  example: 21,
+                },
+                episodeNumber: {
+                  type: 'integer',
+                  example: 1,
+                },
+                hianimeId: {
+                  type: 'string',
+                  example: 'one-piece-100',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['pending'],
+                  example: 'pending',
+                },
+                task: {
                   type: 'object',
                   properties: {
-                    start: {
-                      type: 'number',
-                      example: 90,
+                    taskId: {
+                      type: 'string',
+                      example: '5bd503cf-e0f4-4dc4-b5e8-e9f3f9f2f8a4',
                     },
-                    end: {
-                      type: 'number',
-                      example: 120,
+                    status: {
+                      type: 'string',
+                      example: 'pending',
                     },
                   },
                 },
-                outro: {
-                  type: 'object',
-                  properties: {
-                    start: {
-                      type: 'number',
-                      example: 1320,
-                    },
-                    end: {
-                      type: 'number',
-                      example: 1410,
-                    },
-                  },
+              },
+            },
+          },
+        },
+        StreamingTaskStatusResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            data: {
+              type: 'object',
+              properties: {
+                taskId: {
+                  type: 'string',
+                  example: '5bd503cf-e0f4-4dc4-b5e8-e9f3f9f2f8a4',
+                },
+                status: {
+                  type: 'string',
+                  example: 'success',
+                },
+                result: {
+                  $ref: '#/components/schemas/EpisodeSourcesData',
+                },
+                error: {
+                  type: 'string',
+                  nullable: true,
+                  example: "Episode '123456' not found",
                 },
               },
             },
