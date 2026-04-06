@@ -42,4 +42,8 @@ coverage/
 *.tmp
 .cache/
 
-/docs
+#plan
+plan/
+docs/
+# Ignore user uploaded media
+public/uploads/

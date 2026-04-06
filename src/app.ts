@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
+import path from 'node:path';
 import container from './config/container';
 import { swaggerSpec, swaggerUi } from './config/swagger';
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -15,6 +16,7 @@ const createApp = (): Application => {
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use('/uploads', express.static(path.resolve(process.cwd(), 'public', 'uploads')));
 
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.container = container;
