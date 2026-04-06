@@ -116,8 +116,8 @@ class StreamingService extends BaseService implements IStreamingService {
   async getEpisodeSources(
     anilistId: number,
     episodeNumber: number,
-    refresh: boolean = false,
-    asyncMode: boolean = false,
+    refresh?: boolean,
+    asyncMode?: boolean,
     server?: StreamingServer,
     category?: AudioCategory,
     requestId?: string
@@ -164,7 +164,7 @@ class StreamingService extends BaseService implements IStreamingService {
           capturedAt: new Date().toISOString(),
           upstreamEpisodeId: episode.episodeId,
           meta: {
-            refreshed: refresh,
+            refreshed: refresh ?? false,
             source: 'aniwatch_proxy',
           },
         },

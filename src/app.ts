@@ -38,7 +38,6 @@ const createApp = (): Application => {
     swaggerUi.setup(swaggerSpec, {
       customCss: '.swagger-ui .topbar { display: none }',
       customSiteTitle: 'MyAnilist API Docs',
-      customfavIcon: '/assets/favicon.ico',
     })
   );
 

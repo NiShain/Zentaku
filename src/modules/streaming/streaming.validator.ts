@@ -44,18 +44,18 @@ export const validateGetEpisodeSources = [
     .toInt(),
 
   query('server')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .isIn([...STREAMING_SERVERS])
     .withMessage(`Invalid server. Must be one of: ${STREAMING_SERVERS.join(', ')}`),
 
   query('category')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .isIn([...AUDIO_CATEGORIES])
     .withMessage(`Invalid category. Must be one of: ${AUDIO_CATEGORIES.join(', ')}`),
 
-  query('refresh').optional().customSanitizer(parseBooleanLike),
+  query('refresh').optional({ nullable: true, checkFalsy: true }).customSanitizer(parseBooleanLike),
 
-  query('async').optional().customSanitizer(parseBooleanLike),
+  query('async').optional({ nullable: true, checkFalsy: true }).customSanitizer(parseBooleanLike),
 
   handleValidationErrors,
 ];

@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import {
   validateGetEpisodes,
-  validateGetEpisodeServers,
   validateGetEpisodeSources,
   validateGetTaskStatus,
   validateSyncHianimeId,
@@ -76,49 +75,6 @@ const createStreamingRoutes = (container: unknown): Router => {
 
   /**
    * @swagger
-   * /api/streaming/{anilistId}/episodes/{episodeNumber}/servers:
-   *   get:
-   *     tags:
-   *       - Streaming
-   *     summary: Get available servers for a specific episode
-   *     description: Retrieves list of available streaming servers for an episode (sub/dub/raw)
-   *     parameters:
-   *       - in: path
-   *         name: anilistId
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: AniList anime ID
-   *         example: 21
-   *       - in: path
-   *         name: episodeNumber
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: Episode number
-   *         example: 1
-   *     responses:
-   *       200:
-   *         description: Episode servers retrieved successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/EpisodeServersResponse'
-   *       400:
-   *         $ref: '#/components/responses/ValidationError'
-   *       404:
-   *         $ref: '#/components/responses/NotFoundError'
-   *       500:
-   *         $ref: '#/components/responses/ServerError'
-   */
-  router.get(
-    '/:anilistId/episodes/:episodeNumber/servers',
-    validateGetEpisodeServers,
-    controller.getEpisodeServers
-  );
-
-  /**
-   * @swagger
    * /api/streaming/{anilistId}/episodes/{episodeNumber}/sources:
    *   get:
    *     tags:
@@ -140,36 +96,6 @@ const createStreamingRoutes = (container: unknown): Router => {
    *           type: integer
    *         description: Episode number
    *         example: 1
-   *       - in: query
-   *         name: server
-   *         required: false
-   *         schema:
-   *           type: string
-   *           enum: [hd-1, hd-2, meg-1, meg-2]
-   *         description: Preferred streaming server
-   *         example: hd-1
-   *       - in: query
-   *         name: category
-   *         required: false
-   *         schema:
-   *           type: string
-   *           enum: [sub, dub, raw]
-   *         description: Audio category (subtitle/dubbed/raw)
-   *         example: sub
-   *       - in: query
-   *         name: refresh
-   *         required: false
-   *         schema:
-   *           type: boolean
-   *         description: Force refresh from upstream provider
-   *         example: false
-   *       - in: query
-   *         name: async
-   *         required: false
-   *         schema:
-   *           type: boolean
-   *         description: Enqueue async crawling task and return pending metadata
-   *         example: true
    *     responses:
    *       200:
    *         description: Streaming sources retrieved successfully

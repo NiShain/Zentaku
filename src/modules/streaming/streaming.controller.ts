@@ -26,6 +26,23 @@ const parseBooleanLike = (value: unknown): boolean => {
   return BOOLEAN_LIKE_TRUE_VALUES.has(value.trim().toLowerCase());
 };
 
+const parseOptionalBooleanLike = (value: unknown): boolean | undefined => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  return parseBooleanLike(value);
+};
+
+const parseOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 class StreamingController extends BaseController<StreamingService> {
   constructor(service: StreamingService) {
     super(service);
@@ -42,11 +59,11 @@ class StreamingController extends BaseController<StreamingService> {
   getEpisodeSources = this.asyncHandler(async (req: Request, res: Response) => {
     const anilistId = this.getIntParam(req, 'anilistId');
     const episodeNumber = this.getIntParam(req, 'episodeNumber');
-    const server = req.query.server as StreamingServer | undefined;
-    const category = req.query.category as AudioCategory | undefined;
+    const server = parseOptionalString(req.query.server) as StreamingServer | undefined;
+    const category = parseOptionalString(req.query.category) as AudioCategory | undefined;
     const requestId = req.requestId;
-    const refresh = parseBooleanLike(req.query.refresh);
-    const asyncMode = parseBooleanLike(req.query.async);
+    const refresh = parseOptionalBooleanLike(req.query.refresh);
+    const asyncMode = parseOptionalBooleanLike(req.query.async);
 
     this.logInfo('Fetching episode sources', {
       anilistId,

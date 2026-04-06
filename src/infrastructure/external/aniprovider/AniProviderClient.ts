@@ -12,6 +12,7 @@ import type {
 } from './aniprovider.types';
 
 const TRANSIENT_STATUS_CODES = new Set([503, 504]);
+const RETRYABLE_UPSTREAM_CODES = new Set(['UPSTREAM_TIMEOUT', 'UPSTREAM_NETWORK_ERROR']);
 
 class AniProviderClient {
   private readonly baseUrl: string;
@@ -30,7 +31,7 @@ class AniProviderClient {
     this.authMode = process.env.ANIPROVIDER_AUTH_MODE === 'Bearer' ? 'Bearer' : 'X-API-Key';
 
     const parsedTimeout = Number.parseInt(process.env.ANIPROVIDER_TIMEOUT || '', 10);
-    this.timeoutMs = Number.isInteger(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 12000;
+    this.timeoutMs = Number.isInteger(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 25000;
 
     logger.info(
       `[AniProvider] Client initialized with base URL ${this.baseUrl}, auth mode ${this.authMode}`
@@ -41,13 +42,15 @@ class AniProviderClient {
     animeId: string,
     options: AniProviderRequestOptions = {}
   ): Promise<AniProviderEpisodesResponse> {
-    const refresh = options.refresh ?? false;
+    const params: Record<string, string> = {};
+    if (typeof options.refresh === 'boolean') {
+      params.refresh = String(options.refresh);
+    }
+
     const response = await this._getWithRetry<AniProviderEpisodesResponse>(
       `/api/animes/${encodeURIComponent(animeId)}/episodes`,
       {
-        params: {
-          refresh: String(refresh),
-        },
+        params: Object.keys(params).length > 0 ? params : undefined,
         requestId: options.requestId,
       }
     );
@@ -59,13 +62,20 @@ class AniProviderClient {
     episodeId: string,
     options: AniProviderGetSourcesOptions = {}
   ): Promise<AniProviderSourcesResponse> {
+    const params: Record<string, string> = {};
+
+    if (typeof options.refresh === 'boolean') {
+      params.refresh = String(options.refresh);
+    }
+
+    if (typeof options.async === 'boolean') {
+      params.async = String(options.async);
+    }
+
     const response = await this._getWithRetry<AniProviderSourcesResponse>(
       `/api/episodes/${encodeURIComponent(episodeId)}/sources`,
       {
-        params: {
-          refresh: String(options.refresh ?? false),
-          async: String(options.async ?? false),
-        },
+        params: Object.keys(params).length > 0 ? params : undefined,
         requestId: options.requestId,
       }
     );
@@ -86,7 +96,7 @@ class AniProviderClient {
       requestId?: string;
     }
   ): Promise<T> {
-    const maxAttempts = 2;
+    const maxAttempts = 3;
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -99,13 +109,16 @@ class AniProviderClient {
           throw error;
         }
 
-        if (!TRANSIENT_STATUS_CODES.has(error.statusCode) || attempt === maxAttempts) {
+        const shouldRetry =
+          TRANSIENT_STATUS_CODES.has(error.statusCode) || RETRYABLE_UPSTREAM_CODES.has(error.code);
+
+        if (!shouldRetry || attempt === maxAttempts) {
           throw error;
         }
 
-        const delayMs = 150 * attempt;
+        const delayMs = 250 * attempt;
         logger.warn(
-          `[AniProvider] Transient error ${error.statusCode} for ${path}, retrying in ${delayMs}ms`
+          `[AniProvider] Retryable upstream error (${error.code}, ${error.statusCode}) for ${path}, retrying in ${delayMs}ms`
         );
         await this._sleep(delayMs);
       }
@@ -156,19 +169,36 @@ class AniProviderClient {
 
   private _normalizeUpstreamError(error: unknown): AniProviderUpstreamError {
     const axiosError = error as AxiosError<AniProviderErrorEnvelope>;
-    const statusCode = axiosError.response?.status ?? 500;
+    const axiosCode = axiosError.code;
+    const hasResponse = Boolean(axiosError.response);
+    const hasTimedOut = axiosCode === 'ECONNABORTED' || /timeout/i.test(axiosError.message || '');
+    const hasNetworkError = !hasResponse && !hasTimedOut;
+    const statusCode =
+      axiosError.response?.status ?? (hasTimedOut ? 504 : hasNetworkError ? 503 : 500);
     const upstreamError = axiosError.response?.data?.error;
     const responseRequestId = this._getHeaderValue(axiosError.response?.headers, 'x-request-id');
 
     const message =
       upstreamError?.message || axiosError.message || 'AniProvider request failed unexpectedly';
 
+    const normalizedCode =
+      upstreamError?.code ||
+      (hasTimedOut
+        ? 'UPSTREAM_TIMEOUT'
+        : hasNetworkError
+          ? 'UPSTREAM_NETWORK_ERROR'
+          : 'INTERNAL_ERROR');
+
+    const normalizedDetails =
+      upstreamError?.details ||
+      (axiosCode ? ({ axios_code: axiosCode } as Record<string, unknown>) : null);
+
     return new AniProviderUpstreamError(
       message,
       statusCode,
-      upstreamError?.code || 'INTERNAL_ERROR',
+      normalizedCode,
       upstreamError?.request_id || responseRequestId,
-      upstreamError?.details || null
+      normalizedDetails
     );
   }
 
