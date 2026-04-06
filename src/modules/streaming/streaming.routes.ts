@@ -3,6 +3,7 @@ import {
   validateGetEpisodes,
   validateGetEpisodeServers,
   validateGetEpisodeSources,
+  validateGetTaskStatus,
   validateSyncHianimeId,
 } from './streaming.validator';
 
@@ -47,6 +48,31 @@ const createStreamingRoutes = (container: unknown): Router => {
    *         $ref: '#/components/responses/ServerError'
    */
   router.post('/:anilistId/sync', validateSyncHianimeId, controller.syncHianimeId);
+
+  /**
+   * @swagger
+   * /api/streaming/tasks/{taskId}:
+   *   get:
+   *     tags:
+   *       - Streaming
+   *     summary: Get async streaming task status
+   *     description: Poll AniProvider task status after requesting async episode sources
+   *     parameters:
+   *       - in: path
+   *         name: taskId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: AniProvider task identifier
+   *     responses:
+   *       200:
+   *         description: Task status retrieved successfully
+   *       400:
+   *         $ref: '#/components/responses/ValidationError'
+   *       500:
+   *         $ref: '#/components/responses/ServerError'
+   */
+  router.get('/tasks/:taskId', validateGetTaskStatus, controller.getTaskStatus);
 
   /**
    * @swagger
@@ -130,6 +156,20 @@ const createStreamingRoutes = (container: unknown): Router => {
    *           enum: [sub, dub, raw]
    *         description: Audio category (subtitle/dubbed/raw)
    *         example: sub
+   *       - in: query
+   *         name: refresh
+   *         required: false
+   *         schema:
+   *           type: boolean
+   *         description: Force refresh from upstream provider
+   *         example: false
+   *       - in: query
+   *         name: async
+   *         required: false
+   *         schema:
+   *           type: boolean
+   *         description: Enqueue async crawling task and return pending metadata
+   *         example: true
    *     responses:
    *       200:
    *         description: Streaming sources retrieved successfully
@@ -137,6 +177,12 @@ const createStreamingRoutes = (container: unknown): Router => {
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/EpisodeSourcesResponse'
+   *       202:
+   *         description: Async source capture task accepted
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/EpisodeSourcesPendingResponse'
    *       400:
    *         $ref: '#/components/responses/ValidationError'
    *       404:

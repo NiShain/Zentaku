@@ -12,6 +12,20 @@ import { BaseController } from '../../core/base/BaseController';
 import type { AudioCategory, StreamingServer } from '../../core/types/streaming.types';
 import type StreamingService from './streaming.service';
 
+const BOOLEAN_LIKE_TRUE_VALUES = new Set(['1', 'true', 'yes', 'y']);
+
+const parseBooleanLike = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return BOOLEAN_LIKE_TRUE_VALUES.has(value.trim().toLowerCase());
+};
+
 class StreamingController extends BaseController<StreamingService> {
   constructor(service: StreamingService) {
     super(service);
@@ -30,10 +44,16 @@ class StreamingController extends BaseController<StreamingService> {
     const episodeNumber = this.getIntParam(req, 'episodeNumber');
     const server = req.query.server as StreamingServer | undefined;
     const category = req.query.category as AudioCategory | undefined;
+    const requestId = req.requestId;
+    const refresh = parseBooleanLike(req.query.refresh);
+    const asyncMode = parseBooleanLike(req.query.async);
 
     this.logInfo('Fetching episode sources', {
       anilistId,
       episodeNumber,
+      refresh,
+      asyncMode,
+      requestId,
       server,
       category,
     });
@@ -41,11 +61,14 @@ class StreamingController extends BaseController<StreamingService> {
     const sources = await this.service.getEpisodeSources(
       anilistId,
       episodeNumber,
+      refresh,
+      asyncMode,
       server,
-      category
+      category,
+      requestId
     );
 
-    return this.success(res, sources);
+    return this.success(res, sources, sources.status === 'pending' ? 202 : 200);
   });
 
   /**
@@ -100,6 +123,21 @@ class StreamingController extends BaseController<StreamingService> {
     const syncResult = await this.service.syncHianimeId(anilistId);
 
     return this.success(res, syncResult, 200);
+  });
+
+  /**
+   * GET /streaming/tasks/:taskId
+   * Get async task status from AniProvider
+   */
+  getTaskStatus = this.asyncHandler(async (req: Request, res: Response) => {
+    const taskId = String(req.params.taskId || '');
+    const requestId = req.requestId;
+
+    this.logInfo('Fetching task status', { taskId, requestId });
+
+    const taskStatus = await this.service.getTaskStatus(taskId, requestId);
+
+    return this.success(res, taskStatus);
   });
 }
 

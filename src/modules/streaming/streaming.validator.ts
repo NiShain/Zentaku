@@ -5,6 +5,20 @@ import {
   STREAMING_SERVERS,
 } from '../../infrastructure/external/aniwatch/aniwatch.types';
 
+const BOOLEAN_LIKE_TRUE_VALUES = new Set(['1', 'true', 'yes', 'y']);
+
+const parseBooleanLike = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return BOOLEAN_LIKE_TRUE_VALUES.has(value.trim().toLowerCase());
+};
+
 const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -39,6 +53,10 @@ export const validateGetEpisodeSources = [
     .isIn([...AUDIO_CATEGORIES])
     .withMessage(`Invalid category. Must be one of: ${AUDIO_CATEGORIES.join(', ')}`),
 
+  query('refresh').optional().customSanitizer(parseBooleanLike),
+
+  query('async').optional().customSanitizer(parseBooleanLike),
+
   handleValidationErrors,
 ];
 
@@ -69,6 +87,15 @@ export const validateGetEpisodeServers = [
 
 export const validateSyncHianimeId = [
   param('anilistId').isInt({ min: 1 }).withMessage('AniList ID must be a positive integer').toInt(),
+
+  handleValidationErrors,
+];
+
+export const validateGetTaskStatus = [
+  param('taskId')
+    .isString()
+    .matches(/^[a-zA-Z0-9-]{8,128}$/)
+    .withMessage('Task ID is invalid'),
 
   handleValidationErrors,
 ];
