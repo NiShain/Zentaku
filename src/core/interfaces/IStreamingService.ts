@@ -4,6 +4,7 @@ import type {
   EpisodeServersResponse,
   EpisodeSourcesResponse,
   StreamingServer,
+  StreamingTaskStatusResponse,
   SyncHianimeIdResponse,
 } from '../types/streaming.types';
 
@@ -22,8 +23,11 @@ export interface IStreamingService {
   getEpisodeSources(
     anilistId: number,
     episodeNumber: number,
+    refresh?: boolean,
+    async?: boolean,
     server?: StreamingServer,
-    category?: AudioCategory
+    category?: AudioCategory,
+    requestId?: string
   ): Promise<EpisodeSourcesResponse>;
 
   /**
@@ -35,4 +39,9 @@ export interface IStreamingService {
    * Get available servers for a specific episode
    */
   getEpisodeServers(anilistId: number, episodeNumber: number): Promise<EpisodeServersResponse>;
+
+  /**
+   * Get async task status from provider
+   */
+  getTaskStatus(taskId: string, requestId?: string): Promise<StreamingTaskStatusResponse>;
 }

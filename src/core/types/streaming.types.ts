@@ -1,7 +1,6 @@
 import type {
   AudioCategory,
   EpisodeServers,
-  EpisodeSources,
   StreamingServer,
 } from '../../infrastructure/external/aniwatch/aniwatch.types';
 
@@ -11,14 +10,40 @@ export type { AudioCategory, StreamingServer };
 export interface GetEpisodeSourcesParams {
   anilistId: number;
   episodeNumber: number;
+  refresh?: boolean;
+  async?: boolean;
   server?: StreamingServer;
   category?: AudioCategory;
 }
 
-export interface EpisodeSourcesResponse extends EpisodeSources {
+export interface EpisodeSourcesData {
+  streamLinks: string[];
+  subtitles: SubtitleTrack[];
+  capturedAt: string;
+  upstreamEpisodeId: string;
+  meta: {
+    refreshed: boolean;
+    source: string;
+  };
+}
+
+export interface SubtitleTrack {
+  url: string;
+  lang: string;
+}
+
+export interface EpisodeSourcesTaskMeta {
+  taskId: string;
+  status: string;
+}
+
+export interface EpisodeSourcesResponse {
   anilistId: number;
   episodeNumber: number;
   hianimeId: string;
+  status: 'success' | 'pending';
+  data?: EpisodeSourcesData;
+  task?: EpisodeSourcesTaskMeta;
 }
 
 export interface SyncHianimeIdResponse {
@@ -49,6 +74,8 @@ export interface EpisodeInfo {
   number: number;
   title: string;
   episodeId: string;
+  order?: number;
+  episodeUrl?: string;
   isFiller?: boolean;
 }
 
@@ -56,6 +83,13 @@ export interface EpisodeServersResponse extends EpisodeServers {
   anilistId: number;
   episodeNumber: number;
   hianimeId: string;
+}
+
+export interface StreamingTaskStatusResponse {
+  taskId: string;
+  status: string;
+  result?: EpisodeSourcesData;
+  error?: string;
 }
 
 export enum StreamingErrorCode {
