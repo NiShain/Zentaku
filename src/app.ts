@@ -2,6 +2,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import container from './config/container';
 import { swaggerSpec, swaggerUi } from './config/swagger';
@@ -17,6 +18,14 @@ const createApp = (): Application => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use('/uploads', express.static(path.resolve(process.cwd(), 'public', 'uploads')));
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const incomingRequestId = req.header('X-Request-ID') || req.header('x-request-id');
+    const requestId = incomingRequestId || randomUUID();
+    req.requestId = requestId;
+    res.setHeader('X-Request-ID', requestId);
+    next();
+  });
 
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.container = container;
