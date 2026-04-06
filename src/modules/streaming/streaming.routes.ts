@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import {
   validateGetEpisodes,
-  validateGetEpisodeServers,
   validateGetEpisodeSources,
+  validateGetTaskStatus,
   validateSyncHianimeId,
 } from './streaming.validator';
 
@@ -50,46 +50,28 @@ const createStreamingRoutes = (container: unknown): Router => {
 
   /**
    * @swagger
-   * /api/streaming/{anilistId}/episodes/{episodeNumber}/servers:
+   * /api/streaming/tasks/{taskId}:
    *   get:
    *     tags:
    *       - Streaming
-   *     summary: Get available servers for a specific episode
-   *     description: Retrieves list of available streaming servers for an episode (sub/dub/raw)
+   *     summary: Get async streaming task status
+   *     description: Poll AniProvider task status after requesting async episode sources
    *     parameters:
    *       - in: path
-   *         name: anilistId
+   *         name: taskId
    *         required: true
    *         schema:
-   *           type: integer
-   *         description: AniList anime ID
-   *         example: 21
-   *       - in: path
-   *         name: episodeNumber
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: Episode number
-   *         example: 1
+   *           type: string
+   *         description: AniProvider task identifier
    *     responses:
    *       200:
-   *         description: Episode servers retrieved successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/EpisodeServersResponse'
+   *         description: Task status retrieved successfully
    *       400:
    *         $ref: '#/components/responses/ValidationError'
-   *       404:
-   *         $ref: '#/components/responses/NotFoundError'
    *       500:
    *         $ref: '#/components/responses/ServerError'
    */
-  router.get(
-    '/:anilistId/episodes/:episodeNumber/servers',
-    validateGetEpisodeServers,
-    controller.getEpisodeServers
-  );
+  router.get('/tasks/:taskId', validateGetTaskStatus, controller.getTaskStatus);
 
   /**
    * @swagger
@@ -114,22 +96,6 @@ const createStreamingRoutes = (container: unknown): Router => {
    *           type: integer
    *         description: Episode number
    *         example: 1
-   *       - in: query
-   *         name: server
-   *         required: false
-   *         schema:
-   *           type: string
-   *           enum: [hd-1, hd-2, meg-1, meg-2]
-   *         description: Preferred streaming server
-   *         example: hd-1
-   *       - in: query
-   *         name: category
-   *         required: false
-   *         schema:
-   *           type: string
-   *           enum: [sub, dub, raw]
-   *         description: Audio category (subtitle/dubbed/raw)
-   *         example: sub
    *     responses:
    *       200:
    *         description: Streaming sources retrieved successfully
@@ -137,6 +103,12 @@ const createStreamingRoutes = (container: unknown): Router => {
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/EpisodeSourcesResponse'
+   *       202:
+   *         description: Async source capture task accepted
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/EpisodeSourcesPendingResponse'
    *       400:
    *         $ref: '#/components/responses/ValidationError'
    *       404:

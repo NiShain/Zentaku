@@ -23,7 +23,10 @@ declare namespace NodeJS {
     readonly CORS_ORIGIN?: string;
     readonly LOG_LEVEL?: 'error' | 'warn' | 'info' | 'debug';
     readonly ANILIST_API_URL?: string;
-    readonly ANIWATCH_API_URL?: string;
+    readonly ANIPROVIDER_BASE_URL?: string;
+    readonly ANIPROVIDER_API_KEY?: string;
+    readonly ANIPROVIDER_AUTH_MODE?: 'X-API-Key' | 'Bearer';
+    readonly ANIPROVIDER_TIMEOUT?: string;
     readonly CACHE_TTL?: string;
   }
 }
