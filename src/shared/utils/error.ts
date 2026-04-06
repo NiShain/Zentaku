@@ -69,6 +69,30 @@ export class UnauthorizedError extends Error implements OperationalError {
   }
 }
 
+export class AniProviderUpstreamError extends Error implements OperationalError {
+  public readonly statusCode: number;
+  public readonly isOperational: boolean = true;
+  public readonly code: string;
+  public readonly requestId?: string;
+  public readonly details: Record<string, unknown> | null;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    code: string,
+    requestId?: string,
+    details: Record<string, unknown> | null = null
+  ) {
+    super(message);
+    this.name = 'AniProviderUpstreamError';
+    this.statusCode = statusCode;
+    this.code = code;
+    this.requestId = requestId;
+    this.details = details;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
 /**
  * Type guard to check if error is operational
  */
