@@ -215,7 +215,6 @@ class Container {
         'readingMediaService',
         'readingMediaController',
         'malSyncClient',
-        'aniwatchClient',
         'aniProviderClient',
         'streamingService',
         'streamingController',

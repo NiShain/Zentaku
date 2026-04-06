@@ -9,7 +9,6 @@
 
 import type { Request, Response } from 'express';
 import { BaseController } from '../../core/base/BaseController';
-import type { AudioCategory, StreamingServer } from '../../core/types/streaming.types';
 import type StreamingService from './streaming.service';
 
 const BOOLEAN_LIKE_TRUE_VALUES = new Set(['1', 'true', 'yes', 'y']);
@@ -34,15 +33,6 @@ const parseOptionalBooleanLike = (value: unknown): boolean | undefined => {
   return parseBooleanLike(value);
 };
 
-const parseOptionalString = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const normalized = value.trim();
-  return normalized.length > 0 ? normalized : undefined;
-};
-
 class StreamingController extends BaseController<StreamingService> {
   constructor(service: StreamingService) {
     super(service);
@@ -59,8 +49,6 @@ class StreamingController extends BaseController<StreamingService> {
   getEpisodeSources = this.asyncHandler(async (req: Request, res: Response) => {
     const anilistId = this.getIntParam(req, 'anilistId');
     const episodeNumber = this.getIntParam(req, 'episodeNumber');
-    const server = parseOptionalString(req.query.server) as StreamingServer | undefined;
-    const category = parseOptionalString(req.query.category) as AudioCategory | undefined;
     const requestId = req.requestId;
     const refresh = parseOptionalBooleanLike(req.query.refresh);
     const asyncMode = parseOptionalBooleanLike(req.query.async);
@@ -71,8 +59,6 @@ class StreamingController extends BaseController<StreamingService> {
       refresh,
       asyncMode,
       requestId,
-      server,
-      category,
     });
 
     const sources = await this.service.getEpisodeSources(
@@ -80,8 +66,6 @@ class StreamingController extends BaseController<StreamingService> {
       episodeNumber,
       refresh,
       asyncMode,
-      server,
-      category,
       requestId
     );
 
@@ -105,24 +89,6 @@ class StreamingController extends BaseController<StreamingService> {
     const episodes = await this.service.getAvailableEpisodes(anilistId, page, limit);
 
     return this.success(res, episodes);
-  });
-
-  /**
-   * GET /streaming/:anilistId/episodes/:episodeNumber/servers
-   * Get available servers for a specific episode
-   *
-   * @param req - Express request
-   * @param res - Express response
-   */
-  getEpisodeServers = this.asyncHandler(async (req: Request, res: Response) => {
-    const anilistId = this.getIntParam(req, 'anilistId');
-    const episodeNumber = this.getIntParam(req, 'episodeNumber');
-
-    this.logInfo('Fetching episode servers', { anilistId, episodeNumber });
-
-    const servers = await this.service.getEpisodeServers(anilistId, episodeNumber);
-
-    return this.success(res, servers);
   });
 
   /**

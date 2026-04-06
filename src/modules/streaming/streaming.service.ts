@@ -10,13 +10,10 @@
 import { BaseService } from '../../core/base/BaseService';
 import type { IStreamingService } from '../../core/interfaces/IStreamingService';
 import type {
-  AudioCategory,
   AvailableEpisodesResponse,
   EpisodeInfo,
-  EpisodeServersResponse,
   EpisodeSourcesData,
   EpisodeSourcesResponse,
-  StreamingServer,
   StreamingTaskStatusResponse,
   SyncHianimeIdResponse,
 } from '../../core/types/streaming.types';
@@ -25,25 +22,19 @@ import type {
   AniProviderEpisodesResponse,
   AniProviderSourcesSuccessResponse,
 } from '../../infrastructure/external/aniprovider/aniprovider.types';
-import type AniwatchClient from '../../infrastructure/external/aniwatch/AniwatchClient';
 import type MalSyncClient from '../../infrastructure/external/malsync/MalSyncClient';
 import { NotFoundError, ValidationError } from '../../shared/utils/error';
 import type AnimeRepository from '../anime/anime.repository';
 import type AnimeService from '../anime/anime.service';
 
 class StreamingService extends BaseService implements IStreamingService {
-  private readonly providerMode: 'aniwatch' | 'aniprovider';
-
   constructor(
     private readonly animeRepository: AnimeRepository,
     private readonly animeService: AnimeService,
     private readonly malSyncClient: MalSyncClient,
-    private readonly aniwatchClient: AniwatchClient,
     private readonly aniProviderClient: AniProviderClient
   ) {
     super();
-    this.providerMode =
-      process.env.ANIPROVIDER_PROVIDER_MODE === 'aniwatch' ? 'aniwatch' : 'aniprovider';
     this.logger.info('[StreamingService] Initialized');
   }
 
@@ -118,8 +109,6 @@ class StreamingService extends BaseService implements IStreamingService {
     episodeNumber: number,
     refresh?: boolean,
     asyncMode?: boolean,
-    server?: StreamingServer,
-    category?: AudioCategory,
     requestId?: string
   ): Promise<EpisodeSourcesResponse> {
     const validAnilistId = this._validateId(anilistId, 'AniList ID');
@@ -131,45 +120,9 @@ class StreamingService extends BaseService implements IStreamingService {
       refresh,
       asyncMode,
       requestId,
-      server,
-      category,
     });
 
     const hianimeId = await this._getOrSyncHianimeId(validAnilistId);
-
-    if (this.providerMode === 'aniwatch') {
-      const episodesData = await this.aniwatchClient.getAnimeEpisodes(hianimeId, 1, 10000);
-      const episode = episodesData.episodes.find((ep) => ep.number === validEpisodeNumber);
-
-      if (!episode) {
-        throw new NotFoundError(
-          `Episode ${validEpisodeNumber} not found for anime ${validAnilistId}`
-        );
-      }
-
-      const sources = await this.aniwatchClient.getEpisodeSources(
-        episode.episodeId,
-        server,
-        category
-      );
-
-      return {
-        anilistId: validAnilistId,
-        episodeNumber: validEpisodeNumber,
-        hianimeId,
-        status: 'success',
-        data: {
-          streamLinks: sources.sources.map((item) => item.url),
-          subtitles: sources.subtitles.map((item) => ({ url: item.url, lang: item.lang })),
-          capturedAt: new Date().toISOString(),
-          upstreamEpisodeId: episode.episodeId,
-          meta: {
-            refreshed: refresh ?? false,
-            source: 'aniwatch_proxy',
-          },
-        },
-      };
-    }
 
     const episodesData = await this.aniProviderClient.getEpisodes(hianimeId, {
       refresh,
@@ -232,23 +185,7 @@ class StreamingService extends BaseService implements IStreamingService {
 
     const hianimeId = await this._getOrSyncHianimeId(validId);
 
-    if (this.providerMode === 'aniwatch') {
-      const episodesData = await this.aniwatchClient.getAnimeEpisodes(hianimeId, page, limit);
-
-      this.logger.debug(
-        `[StreamingService] Found ${episodesData.episodes.length} episodes (page ${episodesData.pagination?.currentPage}/${episodesData.pagination?.totalPages})`
-      );
-
-      return {
-        anilistId: validId,
-        hianimeId,
-        totalEpisodes: episodesData.totalEpisodes,
-        episodes: episodesData.episodes,
-        pagination: episodesData.pagination,
-      };
-    }
-
-    const episodesData = await this.aniProviderClient.getEpisodes(hianimeId, { refresh: false });
+    const episodesData = await this.aniProviderClient.getEpisodes(hianimeId);
     const allEpisodes = this._toEpisodeInfoList(episodesData.items);
 
     const normalizedPage = Math.max(1, page);
@@ -275,81 +212,11 @@ class StreamingService extends BaseService implements IStreamingService {
     };
   }
 
-  /**
-   * Get available servers for a specific episode
-   *
-   * @param anilistId - AniList anime ID
-   * @param episodeNumber - Episode number
-   * @returns Available servers for the episode
-   */
-  async getEpisodeServers(
-    anilistId: number,
-    episodeNumber: number
-  ): Promise<EpisodeServersResponse> {
-    const validAnilistId = this._validateId(anilistId, 'AniList ID');
-    const validEpisodeNumber = this._validateId(episodeNumber, 'Episode Number');
-
-    this.logger.info(`[StreamingService] Getting episode servers:`, {
-      anilistId: validAnilistId,
-      episodeNumber: validEpisodeNumber,
-    });
-
-    const hianimeId = await this._getOrSyncHianimeId(validAnilistId);
-
-    if (this.providerMode === 'aniwatch') {
-      const episodesData = await this.aniwatchClient.getAnimeEpisodes(hianimeId, 1, 10000);
-      const episode = episodesData.episodes.find((ep) => ep.number === validEpisodeNumber);
-
-      if (!episode) {
-        throw new NotFoundError(
-          `Episode ${validEpisodeNumber} not found for anime ${validAnilistId}`
-        );
-      }
-
-      const servers = await this.aniwatchClient.getEpisodeServers(episode.episodeId);
-
-      this.logger.debug(
-        `[StreamingService] Found servers - sub: ${servers.sub.length}, dub: ${servers.dub.length}, raw: ${servers.raw.length}`
-      );
-
-      return {
-        ...servers,
-        anilistId: validAnilistId,
-        episodeNumber: validEpisodeNumber,
-        hianimeId,
-      };
-    }
-
-    const episodesData = await this.aniProviderClient.getEpisodes(hianimeId, { refresh: false });
-    const episode = this._findEpisodeByNumber(episodesData, validEpisodeNumber);
-
-    if (!episode) {
-      throw new NotFoundError(
-        `Episode ${validEpisodeNumber} not found for anime ${validAnilistId}`
-      );
-    }
-
-    return {
-      episodeId: episode.episodeId,
-      episodeNo: validEpisodeNumber,
-      sub: [{ serverId: 1, serverName: 'aniprovider' }],
-      dub: [],
-      raw: [],
-      anilistId: validAnilistId,
-      episodeNumber: validEpisodeNumber,
-      hianimeId,
-    };
-  }
-
   async getTaskStatus(taskId: string, requestId?: string): Promise<StreamingTaskStatusResponse> {
     const normalizedTaskId = this._validateString(taskId, 'Task ID', {
       minLength: 8,
       maxLength: 128,
     });
-
-    if (this.providerMode === 'aniwatch') {
-      throw new ValidationError('Task polling is only available in AniProvider mode');
-    }
 
     const taskResponse = await this.aniProviderClient.getTaskStatus(normalizedTaskId, requestId);
     const mappedResult = this._mapTaskResult(taskResponse.result);
