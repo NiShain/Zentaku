@@ -3,14 +3,27 @@ import { BaseRepository, type PaginatedResult } from '../../../core/base/BaseRep
 import type { LibraryEntry } from '../../../entities/LibraryEntry.entity';
 import { LibraryStatus } from '../../../entities/types/enums';
 
+export interface LibraryEntryTrackingUpdates {
+  status?: LibraryStatus;
+  progress?: number;
+  progressVolumes?: number | null;
+  score?: number | null;
+  notes?: string | null;
+  isPrivate?: boolean;
+  rewatchCount?: number;
+  startDate?: Date | null;
+  finishDate?: Date | null;
+}
+
 export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
   constructor(repository: Repository<LibraryEntry>) {
     super(repository);
   }
 
-  async followMedia(
+  async upsertLibraryEntry(
     userId: string | bigint,
     mediaId: string | bigint,
+    updates: LibraryEntryTrackingUpdates,
     manager?: EntityManager
   ): Promise<LibraryEntry> {
     const normalizedUserId = this.toBigInt(userId);
@@ -25,21 +38,67 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
     });
 
     if (!existing) {
-      return repo.save(
-        repo.create({
-          userId: normalizedUserId,
-          mediaId: normalizedMediaId,
-          status: LibraryStatus.PLANNING,
-        })
-      );
+      const created = repo.create({
+        userId: normalizedUserId,
+        mediaId: normalizedMediaId,
+        status: updates.status ?? LibraryStatus.PLANNING,
+        progress: updates.progress ?? 0,
+        progressVolumes: updates.progressVolumes ?? null,
+        score: updates.score ?? null,
+        notes: updates.notes ?? null,
+        isPrivate: updates.isPrivate ?? false,
+        rewatchCount: updates.rewatchCount ?? 0,
+        startDate: updates.startDate ?? null,
+        finishDate: updates.finishDate ?? null,
+      });
+
+      return repo.save(created);
     }
 
-    if (existing.status === LibraryStatus.DROPPED) {
-      existing.status = LibraryStatus.PLANNING;
-      return repo.save(existing);
+    if (updates.status !== undefined) {
+      existing.status = updates.status;
+    }
+    if (updates.progress !== undefined) {
+      existing.progress = updates.progress;
+    }
+    if (updates.progressVolumes !== undefined) {
+      existing.progressVolumes = updates.progressVolumes;
+    }
+    if (updates.score !== undefined) {
+      existing.score = updates.score;
+    }
+    if (updates.notes !== undefined) {
+      existing.notes = updates.notes;
+    }
+    if (updates.isPrivate !== undefined) {
+      existing.isPrivate = updates.isPrivate;
+    }
+    if (updates.rewatchCount !== undefined) {
+      existing.rewatchCount = updates.rewatchCount;
+    }
+    if (updates.startDate !== undefined) {
+      existing.startDate = updates.startDate;
+    }
+    if (updates.finishDate !== undefined) {
+      existing.finishDate = updates.finishDate;
     }
 
-    return existing;
+    return repo.save(existing);
+  }
+
+  async followMedia(
+    userId: string | bigint,
+    mediaId: string | bigint,
+    manager?: EntityManager
+  ): Promise<LibraryEntry> {
+    return this.upsertLibraryEntry(
+      userId,
+      mediaId,
+      {
+        status: LibraryStatus.PLANNING,
+      },
+      manager
+    );
   }
 
   async unfollowMedia(
@@ -47,23 +106,14 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
     mediaId: string | bigint,
     manager?: EntityManager
   ): Promise<void> {
-    const normalizedUserId = this.toBigInt(userId);
-    const normalizedMediaId = this.toBigInt(mediaId);
-    const repo = this.getRepositoryForManager(manager);
-
-    const existing = await repo.findOne({
-      where: {
-        userId: normalizedUserId,
-        mediaId: normalizedMediaId,
+    await this.upsertLibraryEntry(
+      userId,
+      mediaId,
+      {
+        status: LibraryStatus.DROPPED,
       },
-    });
-
-    if (!existing) {
-      return;
-    }
-
-    existing.status = LibraryStatus.DROPPED;
-    await repo.save(existing);
+      manager
+    );
   }
 
   async isFollowed(

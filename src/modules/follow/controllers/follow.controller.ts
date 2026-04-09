@@ -5,6 +5,8 @@ import {
   type IBaseService,
 } from '../../../core/base/BaseController';
 import { ActivityTargetType } from '../../activity/types/activity-types';
+import type { FollowMediaRequestDto } from '../dto/follow-media-request.dto';
+import type { MediaTrackingInputDto } from '../dto/media-tracking.dto';
 import { ValidationException } from '../exceptions/follow.exceptions';
 import type { FollowService } from '../services/follow.service';
 
@@ -36,9 +38,20 @@ class FollowController extends BaseController<FollowService & IBaseService> {
     const authReq = req as AuthenticatedRequest;
     const userId = this.getAuthenticatedUserId(authReq);
     const anilistId = this.getRequiredParam(req, 'anilistId');
+    const body = this.getBody<FollowMediaRequestDto>(req);
 
-    const result = await this.service.followMedia(userId, anilistId);
+    const result = await this.service.followMedia(userId, anilistId, body.tracking);
     this.created(res, result);
+  });
+
+  updateMediaTracking = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const authReq = req as AuthenticatedRequest;
+    const userId = this.getAuthenticatedUserId(authReq);
+    const anilistId = this.getRequiredParam(req, 'anilistId');
+    const trackingPayload = this.getBody<MediaTrackingInputDto>(req);
+
+    const result = await this.service.updateMediaTracking(userId, anilistId, trackingPayload);
+    this.success(res, result);
   });
 
   unfollowMedia = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {

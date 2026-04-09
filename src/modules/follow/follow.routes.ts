@@ -40,6 +40,67 @@ const initializeFollowRoutes = (container: Container): Router => {
   /**
    * @swagger
    * /api/follows/media/{anilistId}:
+   *   patch:
+   *     summary: Update manual tracking for a media item
+   *     tags: [Follow]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: anilistId
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               status:
+   *                 type: string
+   *                 enum: [WATCHING, READING, COMPLETED, PLANNING, DROPPED, PAUSED]
+   *               progress:
+   *                 type: integer
+   *                 minimum: 0
+   *               progressVolumes:
+   *                 type: integer
+   *                 minimum: 0
+   *                 nullable: true
+   *               score:
+   *                 type: number
+   *                 minimum: 0
+   *                 nullable: true
+   *               notes:
+   *                 type: string
+   *                 nullable: true
+   *               isPrivate:
+   *                 type: boolean
+   *               rewatchCount:
+   *                 type: integer
+   *                 minimum: 0
+   *               startDate:
+   *                 type: string
+   *                 format: date
+   *                 nullable: true
+   *               finishDate:
+   *                 type: string
+   *                 format: date
+   *                 nullable: true
+   *     responses:
+   *       200:
+   *         description: Media tracking updated successfully
+   *       400:
+   *         $ref: '#/components/responses/ValidationError'
+   *       401:
+   *         description: Unauthorized
+   */
+  router.patch('/follows/media/:anilistId', followController.updateMediaTracking);
+
+  /**
+   * @swagger
+   * /api/follows/media/{anilistId}:
    *   delete:
    *     summary: Unfollow a media item
    *     tags: [Follow]

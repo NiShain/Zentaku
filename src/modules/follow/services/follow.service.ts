@@ -1,6 +1,7 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import { AppDataSource } from '../../../config/database';
 import { BaseService } from '../../../core/base/BaseService';
+import type { LibraryEntry } from '../../../entities/LibraryEntry.entity';
 import { MediaItem } from '../../../entities/MediaItem.entity';
 import { LibraryStatus } from '../../../entities/types/enums';
 import { User } from '../../../entities/User.entity';
@@ -12,13 +13,17 @@ import {
 } from '../../activity/types/activity-types';
 import type { FollowResultDto } from '../dto/follow-result.dto';
 import type { FollowStatusDto } from '../dto/follow-status.dto';
+import type { MediaTrackingInputDto, MediaTrackingSnapshotDto } from '../dto/media-tracking.dto';
 import {
   AlreadyFollowedException,
   NotFollowedException,
   SelfFollowException,
   ValidationException,
 } from '../exceptions/follow.exceptions';
-import type { LibraryEntryRepository } from '../repositories/library-entry.repository';
+import type {
+  LibraryEntryRepository,
+  LibraryEntryTrackingUpdates,
+} from '../repositories/library-entry.repository';
 import type { UserRelationshipRepository } from '../repositories/user-relationship.repository';
 
 export class FollowService extends BaseService {
@@ -31,30 +36,30 @@ export class FollowService extends BaseService {
     super();
   }
 
-  async followMedia(userId: string | bigint, anilistId: string | bigint): Promise<FollowResultDto> {
+  async followMedia(
+    userId: string | bigint,
+    anilistId: string | bigint,
+    trackingInput?: MediaTrackingInputDto
+  ): Promise<FollowResultDto> {
     const actorId = this.validateBigIntLike(userId, 'User ID');
     const normalizedAnilistId = this.validateBigIntLike(anilistId, 'AniList ID');
     const targetAnilistId = this.toStringId(normalizedAnilistId);
     const targetAnilistIdNumber = Number(targetAnilistId);
+    const trackingUpdates = this.normalizeTrackingInput(trackingInput, {
+      status: LibraryStatus.PLANNING,
+    });
 
     const result = await this.dataSource.transaction(async (manager) => {
       const media = await this.resolveMediaByAnilistId(targetAnilistIdNumber, manager);
       const internalMediaId = media.id;
 
-      const isFollowed = await this.libraryEntryRepository.isFollowed(
+      const entry = await this.libraryEntryRepository.upsertLibraryEntry(
         actorId,
         internalMediaId,
+        trackingUpdates,
         manager
       );
-      if (isFollowed) {
-        throw new AlreadyFollowedException('Media is already followed');
-      }
-
-      const entry = await this.libraryEntryRepository.followMedia(
-        actorId,
-        internalMediaId,
-        manager
-      );
+      const trackingSnapshot = this.toTrackingSnapshot(entry);
 
       const metadata: Omit<
         RichActivityMetadata,
@@ -63,6 +68,8 @@ export class FollowService extends BaseService {
         targetName: media.titleRomaji || media.titleEnglish || media.titleNative || undefined,
         targetImage: media.coverImage || undefined,
         mediaType: media.type,
+        trackingStatus: trackingSnapshot.status,
+        trackingProgress: trackingSnapshot.progress,
       };
 
       await this.activityService.createFollowActivity(
@@ -81,6 +88,64 @@ export class FollowService extends BaseService {
         targetType: ActivityTargetType.MEDIA,
         targetId: this.toStringId(targetAnilistId),
         followedAt: entry.createdAt.toISOString(),
+        tracking: trackingSnapshot,
+      };
+    });
+
+    return result;
+  }
+
+  async updateMediaTracking(
+    userId: string | bigint,
+    anilistId: string | bigint,
+    trackingInput: MediaTrackingInputDto
+  ): Promise<FollowResultDto> {
+    const actorId = this.validateBigIntLike(userId, 'User ID');
+    const normalizedAnilistId = this.validateBigIntLike(anilistId, 'AniList ID');
+    const targetAnilistId = this.toStringId(normalizedAnilistId);
+    const targetAnilistIdNumber = Number(targetAnilistId);
+    const trackingUpdates = this.normalizeTrackingInput(trackingInput, undefined, true);
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const media = await this.resolveMediaByAnilistId(targetAnilistIdNumber, manager);
+      const internalMediaId = media.id;
+
+      const entry = await this.libraryEntryRepository.upsertLibraryEntry(
+        actorId,
+        internalMediaId,
+        trackingUpdates,
+        manager
+      );
+      const trackingSnapshot = this.toTrackingSnapshot(entry);
+
+      const metadata: Omit<
+        RichActivityMetadata,
+        'targetId' | 'targetType' | 'action' | 'snapshotAt'
+      > = {
+        targetName: media.titleRomaji || media.titleEnglish || media.titleNative || undefined,
+        targetImage: media.coverImage || undefined,
+        mediaType: media.type,
+        trackingStatus: trackingSnapshot.status,
+        trackingProgress: trackingSnapshot.progress,
+      };
+
+      await this.activityService.createFollowActivity(
+        actorId,
+        targetAnilistId,
+        ActivityTargetType.MEDIA,
+        ActivityAction.FOLLOW,
+        metadata,
+        internalMediaId,
+        manager
+      );
+
+      return {
+        success: true as const,
+        action: ActivityAction.FOLLOW,
+        targetType: ActivityTargetType.MEDIA,
+        targetId: this.toStringId(targetAnilistId),
+        followedAt: entry.createdAt.toISOString(),
+        tracking: trackingSnapshot,
       };
     });
 
@@ -95,6 +160,7 @@ export class FollowService extends BaseService {
     const normalizedAnilistId = this.validateBigIntLike(anilistId, 'AniList ID');
     const targetAnilistId = this.toStringId(normalizedAnilistId);
     const targetAnilistIdNumber = Number(targetAnilistId);
+    let updatedEntry: LibraryEntry | null = null;
 
     await this.dataSource.transaction(async (manager) => {
       const media = await this.resolveMediaByAnilistId(targetAnilistIdNumber, manager);
@@ -110,6 +176,11 @@ export class FollowService extends BaseService {
       }
 
       await this.libraryEntryRepository.unfollowMedia(actorId, internalMediaId, manager);
+      updatedEntry = await this.libraryEntryRepository.getLibraryEntry(
+        actorId,
+        internalMediaId,
+        manager
+      );
 
       const metadata: Omit<
         RichActivityMetadata,
@@ -137,6 +208,7 @@ export class FollowService extends BaseService {
       targetType: ActivityTargetType.MEDIA,
       targetId: this.toStringId(targetAnilistId),
       unfollowedAt: new Date().toISOString(),
+      tracking: updatedEntry ? this.toTrackingSnapshot(updatedEntry) : null,
     };
   }
 
@@ -274,6 +346,7 @@ export class FollowService extends BaseService {
         targetId: this.toStringId(normalizedTargetId),
         isFollowed,
         followedAt: isFollowed && entry ? entry.createdAt.toISOString() : null,
+        tracking: entry ? this.toTrackingSnapshot(entry) : null,
       };
     }
 
@@ -333,6 +406,164 @@ export class FollowService extends BaseService {
 
   private toStringId(value: string | bigint): string {
     return typeof value === 'bigint' ? value.toString() : value;
+  }
+
+  private toTrackingSnapshot(
+    entry: Pick<
+      LibraryEntry,
+      | 'status'
+      | 'progress'
+      | 'progressVolumes'
+      | 'score'
+      | 'notes'
+      | 'isPrivate'
+      | 'rewatchCount'
+      | 'startDate'
+      | 'finishDate'
+    >
+  ): MediaTrackingSnapshotDto {
+    return {
+      status: entry.status,
+      progress: entry.progress,
+      progressVolumes: entry.progressVolumes ?? null,
+      score: entry.score ?? null,
+      notes: entry.notes ?? null,
+      isPrivate: entry.isPrivate,
+      rewatchCount: entry.rewatchCount,
+      startDate: this.normalizeStoredDate(entry.startDate),
+      finishDate: this.normalizeStoredDate(entry.finishDate),
+    };
+  }
+
+  private normalizeStoredDate(value: unknown): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0] ?? null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const directDate = trimmed.split('T')[0] ?? '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(directDate)) {
+        return directDate;
+      }
+
+      const parsed = new Date(trimmed);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0] ?? null;
+      }
+    }
+
+    return null;
+  }
+
+  private normalizeTrackingInput(
+    input?: MediaTrackingInputDto,
+    defaults?: LibraryEntryTrackingUpdates,
+    requireAtLeastOneField = false
+  ): LibraryEntryTrackingUpdates {
+    const updates: LibraryEntryTrackingUpdates = {
+      ...(defaults ?? {}),
+    };
+
+    if (!input) {
+      if (requireAtLeastOneField) {
+        throw new ValidationException('Tracking payload is required');
+      }
+
+      return updates;
+    }
+
+    const inputKeys = Object.keys(input);
+    if (requireAtLeastOneField && inputKeys.length === 0) {
+      throw new ValidationException('Tracking payload must include at least one field');
+    }
+
+    if (input.status !== undefined) {
+      if (!Object.values(LibraryStatus).includes(input.status)) {
+        throw new ValidationException('Invalid library status');
+      }
+      updates.status = input.status;
+    }
+
+    if (input.progress !== undefined) {
+      if (!Number.isInteger(input.progress) || input.progress < 0) {
+        throw new ValidationException('progress must be a non-negative integer');
+      }
+      updates.progress = input.progress;
+    }
+
+    if (input.progressVolumes !== undefined) {
+      if (
+        input.progressVolumes !== null &&
+        (!Number.isInteger(input.progressVolumes) || input.progressVolumes < 0)
+      ) {
+        throw new ValidationException('progressVolumes must be null or a non-negative integer');
+      }
+      updates.progressVolumes = input.progressVolumes;
+    }
+
+    if (input.score !== undefined) {
+      if (input.score !== null && (!Number.isFinite(input.score) || input.score < 0)) {
+        throw new ValidationException('score must be null or a non-negative number');
+      }
+      updates.score = input.score;
+    }
+
+    if (input.notes !== undefined) {
+      if (input.notes !== null && typeof input.notes !== 'string') {
+        throw new ValidationException('notes must be null or a string');
+      }
+      updates.notes = input.notes;
+    }
+
+    if (input.isPrivate !== undefined) {
+      if (typeof input.isPrivate !== 'boolean') {
+        throw new ValidationException('isPrivate must be a boolean');
+      }
+      updates.isPrivate = input.isPrivate;
+    }
+
+    if (input.rewatchCount !== undefined) {
+      if (!Number.isInteger(input.rewatchCount) || input.rewatchCount < 0) {
+        throw new ValidationException('rewatchCount must be a non-negative integer');
+      }
+      updates.rewatchCount = input.rewatchCount;
+    }
+
+    if (input.startDate !== undefined) {
+      updates.startDate = this.normalizeDateInput(input.startDate, 'startDate');
+    }
+
+    if (input.finishDate !== undefined) {
+      updates.finishDate = this.normalizeDateInput(input.finishDate, 'finishDate');
+    }
+
+    return updates;
+  }
+
+  private normalizeDateInput(value: string | null, fieldName: string): Date | null {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw new ValidationException(`${fieldName} must be null or a date string`);
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new ValidationException(`${fieldName} must be a valid date string`);
+    }
+
+    return parsed;
   }
 
   private async resolveMediaByAnilistId(
