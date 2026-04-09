@@ -21,7 +21,7 @@ class FollowController extends BaseController<FollowService & IBaseService> {
     return value;
   }
 
-  private assertSelfAction(req: AuthenticatedRequest, requestedUserId: string): void {
+  private getAuthenticatedUserId(req: AuthenticatedRequest): string {
     this.requireAuth(req);
 
     const tokenUserId = this.getUserId(req);
@@ -29,53 +29,40 @@ class FollowController extends BaseController<FollowService & IBaseService> {
       throw new ValidationException('Unauthorized');
     }
 
-    if (String(tokenUserId) !== requestedUserId) {
-      const error = new Error(
-        'Forbidden: cannot perform follow action for another user'
-      ) as Error & {
-        statusCode?: number;
-      };
-      error.statusCode = 403;
-      throw error;
-    }
+    return String(tokenUserId);
   }
 
   followMedia = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const userId = this.getRequiredParam(req, 'userId');
-    const mediaId = this.getRequiredParam(req, 'mediaId');
+    const userId = this.getAuthenticatedUserId(authReq);
+    const anilistId = this.getRequiredParam(req, 'anilistId');
 
-    this.assertSelfAction(authReq, userId);
-
-    const result = await this.service.followMedia(userId, mediaId);
+    const result = await this.service.followMedia(userId, anilistId);
     this.created(res, result);
   });
 
   unfollowMedia = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const userId = this.getRequiredParam(req, 'userId');
-    const mediaId = this.getRequiredParam(req, 'mediaId');
+    const userId = this.getAuthenticatedUserId(authReq);
+    const anilistId = this.getRequiredParam(req, 'anilistId');
 
-    this.assertSelfAction(authReq, userId);
-
-    const result = await this.service.unfollowMedia(userId, mediaId);
+    const result = await this.service.unfollowMedia(userId, anilistId);
     this.success(res, result);
   });
 
   getMediaFollowStatus = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const userId = this.getRequiredParam(req, 'userId');
-    const mediaId = this.getRequiredParam(req, 'mediaId');
+    const authReq = req as AuthenticatedRequest;
+    const userId = this.getAuthenticatedUserId(authReq);
+    const anilistId = this.getRequiredParam(req, 'anilistId');
 
-    const result = await this.service.getFollowStatus(userId, mediaId, ActivityTargetType.MEDIA);
+    const result = await this.service.getFollowStatus(userId, anilistId, ActivityTargetType.MEDIA);
     this.success(res, result);
   });
 
   followUser = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const userId = this.getRequiredParam(req, 'userId');
+    const userId = this.getAuthenticatedUserId(authReq);
     const targetUserId = this.getRequiredParam(req, 'targetUserId');
-
-    this.assertSelfAction(authReq, userId);
 
     const result = await this.service.followUser(userId, targetUserId);
     this.created(res, result);
@@ -83,17 +70,16 @@ class FollowController extends BaseController<FollowService & IBaseService> {
 
   unfollowUser = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const authReq = req as AuthenticatedRequest;
-    const userId = this.getRequiredParam(req, 'userId');
+    const userId = this.getAuthenticatedUserId(authReq);
     const targetUserId = this.getRequiredParam(req, 'targetUserId');
-
-    this.assertSelfAction(authReq, userId);
 
     const result = await this.service.unfollowUser(userId, targetUserId);
     this.success(res, result);
   });
 
   getUserFollowStatus = this.asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const userId = this.getRequiredParam(req, 'userId');
+    const authReq = req as AuthenticatedRequest;
+    const userId = this.getAuthenticatedUserId(authReq);
     const targetUserId = this.getRequiredParam(req, 'targetUserId');
 
     const result = await this.service.getFollowStatus(

@@ -1,4 +1,4 @@
-import type { DataSource } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import { AppDataSource } from '../../../config/database';
 import { BaseService } from '../../../core/base/BaseService';
 import { MediaItem } from '../../../entities/MediaItem.entity';
@@ -31,27 +31,30 @@ export class FollowService extends BaseService {
     super();
   }
 
-  async followMedia(userId: string | bigint, mediaId: string | bigint): Promise<FollowResultDto> {
+  async followMedia(userId: string | bigint, anilistId: string | bigint): Promise<FollowResultDto> {
     const actorId = this.validateBigIntLike(userId, 'User ID');
-    const targetMediaId = this.validateBigIntLike(mediaId, 'Media ID');
-
-    const isFollowed = await this.libraryEntryRepository.isFollowed(actorId, targetMediaId);
-    if (isFollowed) {
-      throw new AlreadyFollowedException('Media is already followed');
-    }
+    const normalizedAnilistId = this.validateBigIntLike(anilistId, 'AniList ID');
+    const targetAnilistId = this.toStringId(normalizedAnilistId);
+    const targetAnilistIdNumber = Number(targetAnilistId);
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const media = await manager.getRepository(MediaItem).findOne({
-        where: {
-          id: this.toBigInt(targetMediaId),
-        },
-      });
+      const media = await this.resolveMediaByAnilistId(targetAnilistIdNumber, manager);
+      const internalMediaId = media.id;
 
-      if (!media) {
-        throw new ValidationException('Media not found');
+      const isFollowed = await this.libraryEntryRepository.isFollowed(
+        actorId,
+        internalMediaId,
+        manager
+      );
+      if (isFollowed) {
+        throw new AlreadyFollowedException('Media is already followed');
       }
 
-      const entry = await this.libraryEntryRepository.followMedia(actorId, targetMediaId, manager);
+      const entry = await this.libraryEntryRepository.followMedia(
+        actorId,
+        internalMediaId,
+        manager
+      );
 
       const metadata: Omit<
         RichActivityMetadata,
@@ -64,10 +67,11 @@ export class FollowService extends BaseService {
 
       await this.activityService.createFollowActivity(
         actorId,
-        targetMediaId,
+        targetAnilistId,
         ActivityTargetType.MEDIA,
         ActivityAction.FOLLOW,
         metadata,
+        internalMediaId,
         manager
       );
 
@@ -75,7 +79,7 @@ export class FollowService extends BaseService {
         success: true as const,
         action: ActivityAction.FOLLOW,
         targetType: ActivityTargetType.MEDIA,
-        targetId: this.toStringId(targetMediaId),
+        targetId: this.toStringId(targetAnilistId),
         followedAt: entry.createdAt.toISOString(),
       };
     });
@@ -83,23 +87,29 @@ export class FollowService extends BaseService {
     return result;
   }
 
-  async unfollowMedia(userId: string | bigint, mediaId: string | bigint): Promise<FollowResultDto> {
+  async unfollowMedia(
+    userId: string | bigint,
+    anilistId: string | bigint
+  ): Promise<FollowResultDto> {
     const actorId = this.validateBigIntLike(userId, 'User ID');
-    const targetMediaId = this.validateBigIntLike(mediaId, 'Media ID');
-
-    const isFollowed = await this.libraryEntryRepository.isFollowed(actorId, targetMediaId);
-    if (!isFollowed) {
-      throw new NotFollowedException('Media is not followed');
-    }
+    const normalizedAnilistId = this.validateBigIntLike(anilistId, 'AniList ID');
+    const targetAnilistId = this.toStringId(normalizedAnilistId);
+    const targetAnilistIdNumber = Number(targetAnilistId);
 
     await this.dataSource.transaction(async (manager) => {
-      const media = await manager.getRepository(MediaItem).findOne({
-        where: {
-          id: this.toBigInt(targetMediaId),
-        },
-      });
+      const media = await this.resolveMediaByAnilistId(targetAnilistIdNumber, manager);
+      const internalMediaId = media.id;
 
-      await this.libraryEntryRepository.unfollowMedia(actorId, targetMediaId, manager);
+      const isFollowed = await this.libraryEntryRepository.isFollowed(
+        actorId,
+        internalMediaId,
+        manager
+      );
+      if (!isFollowed) {
+        throw new NotFollowedException('Media is not followed');
+      }
+
+      await this.libraryEntryRepository.unfollowMedia(actorId, internalMediaId, manager);
 
       const metadata: Omit<
         RichActivityMetadata,
@@ -112,10 +122,11 @@ export class FollowService extends BaseService {
 
       await this.activityService.createFollowActivity(
         actorId,
-        targetMediaId,
+        targetAnilistId,
         ActivityTargetType.MEDIA,
         ActivityAction.UNFOLLOW,
         metadata,
+        internalMediaId,
         manager
       );
     });
@@ -124,7 +135,7 @@ export class FollowService extends BaseService {
       success: true,
       action: ActivityAction.UNFOLLOW,
       targetType: ActivityTargetType.MEDIA,
-      targetId: this.toStringId(targetMediaId),
+      targetId: this.toStringId(targetAnilistId),
       unfollowedAt: new Date().toISOString(),
     };
   }
@@ -176,6 +187,7 @@ export class FollowService extends BaseService {
         ActivityTargetType.USER,
         ActivityAction.FOLLOW,
         metadata,
+        undefined,
         manager
       );
 
@@ -230,6 +242,7 @@ export class FollowService extends BaseService {
         ActivityTargetType.USER,
         ActivityAction.UNFOLLOW,
         metadata,
+        undefined,
         manager
       );
     });
@@ -252,7 +265,8 @@ export class FollowService extends BaseService {
     const normalizedTargetId = this.validateBigIntLike(targetId, 'Target ID');
 
     if (targetType === ActivityTargetType.MEDIA) {
-      const entry = await this.libraryEntryRepository.getLibraryEntry(actorId, normalizedTargetId);
+      const media = await this.resolveMediaByAnilistId(Number(this.toStringId(normalizedTargetId)));
+      const entry = await this.libraryEntryRepository.getLibraryEntry(actorId, media.id);
       const isFollowed = !!entry && entry.status !== LibraryStatus.DROPPED;
 
       return {
@@ -319,5 +333,25 @@ export class FollowService extends BaseService {
 
   private toStringId(value: string | bigint): string {
     return typeof value === 'bigint' ? value.toString() : value;
+  }
+
+  private async resolveMediaByAnilistId(
+    anilistId: number,
+    manager?: EntityManager
+  ): Promise<MediaItem> {
+    const repository = manager
+      ? manager.getRepository(MediaItem)
+      : this.dataSource.getRepository(MediaItem);
+    const media = await repository.findOne({
+      where: {
+        idAnilist: anilistId,
+      },
+    });
+
+    if (!media) {
+      throw new ValidationException('Media not found');
+    }
+
+    return media;
   }
 }

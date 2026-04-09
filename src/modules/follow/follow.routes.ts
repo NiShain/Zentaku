@@ -11,7 +11,7 @@ const initializeFollowRoutes = (container: Container): Router => {
 
   /**
    * @swagger
-   * /api/users/{userId}/follows/media/{mediaId}:
+   * /api/follows/media/{anilistId}:
    *   post:
    *     summary: Follow a media item
    *     tags: [Follow]
@@ -19,12 +19,7 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       - bearerAuth: []
    *     parameters:
    *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: string
-   *       - in: path
-   *         name: mediaId
+   *         name: anilistId
    *         required: true
    *         schema:
    *           type: string
@@ -40,11 +35,11 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       409:
    *         description: Already followed
    */
-  router.post('/users/:userId/follows/media/:mediaId', followController.followMedia);
+  router.post('/follows/media/:anilistId', followController.followMedia);
 
   /**
    * @swagger
-   * /api/users/{userId}/follows/media/{mediaId}:
+   * /api/follows/media/{anilistId}:
    *   delete:
    *     summary: Unfollow a media item
    *     tags: [Follow]
@@ -52,12 +47,7 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       - bearerAuth: []
    *     parameters:
    *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: string
-   *       - in: path
-   *         name: mediaId
+   *         name: anilistId
    *         required: true
    *         schema:
    *           type: string
@@ -73,11 +63,11 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       404:
    *         description: Not followed
    */
-  router.delete('/users/:userId/follows/media/:mediaId', followController.unfollowMedia);
+  router.delete('/follows/media/:anilistId', followController.unfollowMedia);
 
   /**
    * @swagger
-   * /api/users/{userId}/follows/media/{mediaId}:
+   * /api/follows/media/{anilistId}:
    *   get:
    *     summary: Get media follow status
    *     tags: [Follow]
@@ -85,12 +75,7 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       - bearerAuth: []
    *     parameters:
    *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: string
-   *       - in: path
-   *         name: mediaId
+   *         name: anilistId
    *         required: true
    *         schema:
    *           type: string
@@ -102,22 +87,17 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       401:
    *         description: Unauthorized
    */
-  router.get('/users/:userId/follows/media/:mediaId', followController.getMediaFollowStatus);
+  router.get('/follows/media/:anilistId', followController.getMediaFollowStatus);
 
   /**
    * @swagger
-   * /api/users/{userId}/follows/users/{targetUserId}:
+   * /api/follows/users/{targetUserId}:
    *   post:
    *     summary: Follow a user
    *     tags: [Follow]
    *     security:
    *       - bearerAuth: []
    *     parameters:
-   *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: string
    *       - in: path
    *         name: targetUserId
    *         required: true
@@ -135,22 +115,17 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       409:
    *         description: Already followed
    */
-  router.post('/users/:userId/follows/users/:targetUserId', followController.followUser);
+  router.post('/follows/users/:targetUserId', followController.followUser);
 
   /**
    * @swagger
-   * /api/users/{userId}/follows/users/{targetUserId}:
+   * /api/follows/users/{targetUserId}:
    *   delete:
    *     summary: Unfollow a user
    *     tags: [Follow]
    *     security:
    *       - bearerAuth: []
    *     parameters:
-   *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: string
    *       - in: path
    *         name: targetUserId
    *         required: true
@@ -168,22 +143,17 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       404:
    *         description: Not followed
    */
-  router.delete('/users/:userId/follows/users/:targetUserId', followController.unfollowUser);
+  router.delete('/follows/users/:targetUserId', followController.unfollowUser);
 
   /**
    * @swagger
-   * /api/users/{userId}/follows/users/{targetUserId}:
+   * /api/follows/users/{targetUserId}:
    *   get:
    *     summary: Get user follow status
    *     tags: [Follow]
    *     security:
    *       - bearerAuth: []
    *     parameters:
-   *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: string
    *       - in: path
    *         name: targetUserId
    *         required: true
@@ -197,7 +167,7 @@ const initializeFollowRoutes = (container: Container): Router => {
    *       401:
    *         description: Unauthorized
    */
-  router.get('/users/:userId/follows/users/:targetUserId', followController.getUserFollowStatus);
+  router.get('/follows/users/:targetUserId', followController.getUserFollowStatus);
 
   return router;
 };

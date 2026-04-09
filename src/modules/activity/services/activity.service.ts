@@ -33,6 +33,7 @@ export class ActivityService extends BaseService {
     targetType: ActivityTargetType,
     action: ActivityAction,
     metadata: Omit<RichActivityMetadata, 'targetId' | 'targetType' | 'action' | 'snapshotAt'> = {},
+    mediaId?: string | bigint,
     manager?: EntityManager
   ): Promise<Activity> {
     const validatedUserId = this.validateBigIntLike(userId, 'User ID');
@@ -55,7 +56,12 @@ export class ActivityService extends BaseService {
       action,
       type: activityType,
       metadata: enrichedMetadata,
-      mediaId: targetType === ActivityTargetType.MEDIA ? validatedTargetId : undefined,
+      mediaId:
+        mediaId !== undefined
+          ? this.validateBigIntLike(mediaId, 'Media ID')
+          : targetType === ActivityTargetType.MEDIA
+            ? validatedTargetId
+            : undefined,
     };
 
     return this.activityRepository.createActivity(payload, manager);
