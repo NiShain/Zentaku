@@ -1,6 +1,6 @@
-import type { Repository } from 'typeorm';
+import type { EntityManager, Repository } from 'typeorm';
 import { BaseRepository, type PaginatedResult } from '../../../core/base/BaseRepository';
-import type { Activity } from '../../../entities/Activity.entity';
+import { Activity } from '../../../entities/Activity.entity';
 import type { ActivityQueryPaginationDto, CreateActivityDto } from '../dto/create-activity.dto';
 import type { HeatmapDayDto } from '../dto/heatmap-response.dto';
 
@@ -9,7 +9,7 @@ export class ActivityRepository extends BaseRepository<Activity> {
     super(repository);
   }
 
-  async createActivity(data: CreateActivityDto): Promise<Activity> {
+  async createActivity(data: CreateActivityDto, manager?: EntityManager): Promise<Activity> {
     const payload: Partial<Activity> = {
       userId: this.toBigInt(data.userId),
       type: data.type,
@@ -28,7 +28,9 @@ export class ActivityRepository extends BaseRepository<Activity> {
       payload.communityId = this.toBigInt(data.communityId);
     }
 
-    return this.create(payload);
+    const repo = manager ? manager.getRepository(Activity) : this.repository;
+    const entity = repo.create(payload);
+    return repo.save(entity);
   }
 
   async getActivitiesByUser(

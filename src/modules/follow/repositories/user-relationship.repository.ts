@@ -1,4 +1,4 @@
-import type { Repository } from 'typeorm';
+import type { EntityManager, Repository } from 'typeorm';
 import { BaseRepository, type PaginatedResult } from '../../../core/base/BaseRepository';
 import type { User } from '../../../entities/User.entity';
 import type { UserRelationship } from '../../../entities/UserRelationship.entity';
@@ -11,12 +11,14 @@ export class UserRelationshipRepository extends BaseRepository<UserRelationship>
 
   async followUser(
     followerId: string | bigint,
-    followingId: string | bigint
+    followingId: string | bigint,
+    manager?: EntityManager
   ): Promise<UserRelationship> {
     const normalizedFollowerId = this.toBigInt(followerId);
     const normalizedFollowingId = this.toBigInt(followingId);
+    const repo = this.getRepositoryForManager(manager);
 
-    const existing = await this.findOne({
+    const existing = await repo.findOne({
       where: {
         followerId: normalizedFollowerId,
         followingId: normalizedFollowingId,
@@ -25,7 +27,7 @@ export class UserRelationshipRepository extends BaseRepository<UserRelationship>
 
     if (existing) {
       if (existing.type !== RelationshipType.FOLLOW) {
-        const updated = await this.repository.save({
+        const updated = await repo.save({
           ...existing,
           type: RelationshipType.FOLLOW,
         });
@@ -35,34 +37,69 @@ export class UserRelationshipRepository extends BaseRepository<UserRelationship>
       return existing;
     }
 
-    return this.create({
-      followerId: normalizedFollowerId,
-      followingId: normalizedFollowingId,
-      type: RelationshipType.FOLLOW,
-    });
+    return repo.save(
+      repo.create({
+        followerId: normalizedFollowerId,
+        followingId: normalizedFollowingId,
+        type: RelationshipType.FOLLOW,
+      })
+    );
   }
 
-  async unfollowUser(followerId: string | bigint, followingId: string | bigint): Promise<void> {
+  async unfollowUser(
+    followerId: string | bigint,
+    followingId: string | bigint,
+    manager?: EntityManager
+  ): Promise<void> {
     const normalizedFollowerId = this.toBigInt(followerId);
     const normalizedFollowingId = this.toBigInt(followingId);
+    const repo = this.getRepositoryForManager(manager);
 
     // Schema hien tai cua user_relationships chua ho tro soft delete.
     // Fallback hard delete cho Phase 2; co the doi sang soft delete sau khi co migration.
-    await this.deleteMany({
+    await repo.delete({
       followerId: normalizedFollowerId,
       followingId: normalizedFollowingId,
       type: RelationshipType.FOLLOW,
     });
   }
 
-  async isFollowing(followerId: string | bigint, followingId: string | bigint): Promise<boolean> {
+  async isFollowing(
+    followerId: string | bigint,
+    followingId: string | bigint,
+    manager?: EntityManager
+  ): Promise<boolean> {
     const normalizedFollowerId = this.toBigInt(followerId);
     const normalizedFollowingId = this.toBigInt(followingId);
+    const repo = this.getRepositoryForManager(manager);
 
-    return this.exists({
-      followerId: normalizedFollowerId,
-      followingId: normalizedFollowingId,
-      type: RelationshipType.FOLLOW,
+    const relationship = await repo.findOne({
+      where: {
+        followerId: normalizedFollowerId,
+        followingId: normalizedFollowingId,
+        type: RelationshipType.FOLLOW,
+      },
+      select: ['followerId', 'followingId', 'type'],
+    });
+
+    return Boolean(relationship);
+  }
+
+  async getFollowRelationship(
+    followerId: string | bigint,
+    followingId: string | bigint,
+    manager?: EntityManager
+  ): Promise<UserRelationship | null> {
+    const normalizedFollowerId = this.toBigInt(followerId);
+    const normalizedFollowingId = this.toBigInt(followingId);
+    const repo = this.getRepositoryForManager(manager);
+
+    return repo.findOne({
+      where: {
+        followerId: normalizedFollowerId,
+        followingId: normalizedFollowingId,
+        type: RelationshipType.FOLLOW,
+      },
     });
   }
 
@@ -112,5 +149,9 @@ export class UserRelationshipRepository extends BaseRepository<UserRelationship>
     }
 
     return BigInt(value);
+  }
+
+  private getRepositoryForManager(manager?: EntityManager): Repository<UserRelationship> {
+    return manager ? manager.getRepository(this.repository.target) : this.repository;
   }
 }

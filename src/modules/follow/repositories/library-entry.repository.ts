@@ -1,4 +1,4 @@
-import { Not, type Repository } from 'typeorm';
+import { Not, type EntityManager, type Repository } from 'typeorm';
 import { BaseRepository, type PaginatedResult } from '../../../core/base/BaseRepository';
 import type { LibraryEntry } from '../../../entities/LibraryEntry.entity';
 import { LibraryStatus } from '../../../entities/types/enums';
@@ -8,11 +8,16 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
     super(repository);
   }
 
-  async followMedia(userId: string | bigint, mediaId: string | bigint): Promise<LibraryEntry> {
+  async followMedia(
+    userId: string | bigint,
+    mediaId: string | bigint,
+    manager?: EntityManager
+  ): Promise<LibraryEntry> {
     const normalizedUserId = this.toBigInt(userId);
     const normalizedMediaId = this.toBigInt(mediaId);
+    const repo = this.getRepositoryForManager(manager);
 
-    const existing = await this.findOne({
+    const existing = await repo.findOne({
       where: {
         userId: normalizedUserId,
         mediaId: normalizedMediaId,
@@ -20,31 +25,33 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
     });
 
     if (!existing) {
-      return this.create({
-        userId: normalizedUserId,
-        mediaId: normalizedMediaId,
-        status: LibraryStatus.PLANNING,
-      });
+      return repo.save(
+        repo.create({
+          userId: normalizedUserId,
+          mediaId: normalizedMediaId,
+          status: LibraryStatus.PLANNING,
+        })
+      );
     }
 
     if (existing.status === LibraryStatus.DROPPED) {
-      const reactivated = await this.update(existing.id, {
-        status: LibraryStatus.PLANNING,
-      });
-
-      if (reactivated) {
-        return reactivated;
-      }
+      existing.status = LibraryStatus.PLANNING;
+      return repo.save(existing);
     }
 
     return existing;
   }
 
-  async unfollowMedia(userId: string | bigint, mediaId: string | bigint): Promise<void> {
+  async unfollowMedia(
+    userId: string | bigint,
+    mediaId: string | bigint,
+    manager?: EntityManager
+  ): Promise<void> {
     const normalizedUserId = this.toBigInt(userId);
     const normalizedMediaId = this.toBigInt(mediaId);
+    const repo = this.getRepositoryForManager(manager);
 
-    const existing = await this.findOne({
+    const existing = await repo.findOne({
       where: {
         userId: normalizedUserId,
         mediaId: normalizedMediaId,
@@ -55,16 +62,20 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
       return;
     }
 
-    await this.update(existing.id, {
-      status: LibraryStatus.DROPPED,
-    });
+    existing.status = LibraryStatus.DROPPED;
+    await repo.save(existing);
   }
 
-  async isFollowed(userId: string | bigint, mediaId: string | bigint): Promise<boolean> {
+  async isFollowed(
+    userId: string | bigint,
+    mediaId: string | bigint,
+    manager?: EntityManager
+  ): Promise<boolean> {
     const normalizedUserId = this.toBigInt(userId);
     const normalizedMediaId = this.toBigInt(mediaId);
+    const repo = this.getRepositoryForManager(manager);
 
-    const entry = await this.findOne({
+    const entry = await repo.findOne({
       where: {
         userId: normalizedUserId,
         mediaId: normalizedMediaId,
@@ -73,6 +84,23 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
     });
 
     return !!entry && entry.status !== LibraryStatus.DROPPED;
+  }
+
+  async getLibraryEntry(
+    userId: string | bigint,
+    mediaId: string | bigint,
+    manager?: EntityManager
+  ): Promise<LibraryEntry | null> {
+    const normalizedUserId = this.toBigInt(userId);
+    const normalizedMediaId = this.toBigInt(mediaId);
+    const repo = this.getRepositoryForManager(manager);
+
+    return repo.findOne({
+      where: {
+        userId: normalizedUserId,
+        mediaId: normalizedMediaId,
+      },
+    });
   }
 
   async getFollowedMedias(
@@ -103,5 +131,9 @@ export class LibraryEntryRepository extends BaseRepository<LibraryEntry> {
     }
 
     return BigInt(value);
+  }
+
+  private getRepositoryForManager(manager?: EntityManager): Repository<LibraryEntry> {
+    return manager ? manager.getRepository(this.repository.target) : this.repository;
   }
 }

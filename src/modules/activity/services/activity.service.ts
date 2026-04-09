@@ -1,3 +1,4 @@
+import type { EntityManager } from 'typeorm';
 import { BaseService } from '../../../core/base/BaseService';
 import type { Activity } from '../../../entities/Activity.entity';
 import { ValidationError } from '../../../shared/utils/error';
@@ -31,7 +32,8 @@ export class ActivityService extends BaseService {
     targetId: string | bigint,
     targetType: ActivityTargetType,
     action: ActivityAction,
-    metadata: Omit<RichActivityMetadata, 'targetId' | 'targetType' | 'action' | 'snapshotAt'> = {}
+    metadata: Omit<RichActivityMetadata, 'targetId' | 'targetType' | 'action' | 'snapshotAt'> = {},
+    manager?: EntityManager
   ): Promise<Activity> {
     const validatedUserId = this.validateBigIntLike(userId, 'User ID');
     const validatedTargetId = this.validateBigIntLike(targetId, 'Target ID');
@@ -56,7 +58,7 @@ export class ActivityService extends BaseService {
       mediaId: targetType === ActivityTargetType.MEDIA ? validatedTargetId : undefined,
     };
 
-    return this.activityRepository.createActivity(payload);
+    return this.activityRepository.createActivity(payload, manager);
   }
 
   async getUserActivities(
