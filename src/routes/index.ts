@@ -15,7 +15,7 @@ const initializeRoutes = (container: unknown): Router => {
   const streamingRoutes = require('../modules/streaming/streaming.routes');
   const searchRoutes = require('../modules/search/search.routes');
   const userRoutes = require('../modules/user/user.routes');
-  const { validateGetTaskStatus } = require('../modules/streaming/streaming.validator');
+  const activityRoutes = require('../modules/activity/activity.routes');
 
   router.use('/auth', authRoutes(container));
   router.use('/user', userRoutes(container));
@@ -49,11 +49,16 @@ const initializeRoutes = (container: unknown): Router => {
    *       500:
    *         $ref: '#/components/responses/ServerError'
    */
+
+  const { validateGetTaskStatus } = require('../modules/streaming/streaming.validator');
   router.get(
     '/tasks/:taskId',
     validateGetTaskStatus,
     (container as any).resolve('streamingController').getTaskStatus
   );
+
+  router.use('/', activityRoutes(container));
+
   router.use('/search', searchRoutes(container));
   return router;
 };
