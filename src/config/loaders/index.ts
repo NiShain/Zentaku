@@ -14,6 +14,7 @@ import streamingLoader = require('./streaming.loader');
 import searchLoader = require('./search.loader');
 import userLoader = require('./user.loader');
 import activityLoader = require('./activity.loader');
+import followLoader = require('./follow.loader');
 
 /**
  * Load all modules into the container
@@ -38,6 +39,8 @@ const loadModules = (container: Container): void => {
   searchLoader(container);
 
   activityLoader(container);
+
+  followLoader(container);
 
   logger.debug('[Loaders] All modules registered successfully');
   logger.debug(`[Loaders] Total registered: ${container.getRegistered().length} dependencies`);

@@ -16,6 +16,7 @@ const initializeRoutes = (container: unknown): Router => {
   const searchRoutes = require('../modules/search/search.routes');
   const userRoutes = require('../modules/user/user.routes');
   const activityRoutes = require('../modules/activity/activity.routes');
+  const followRoutes = require('../modules/follow/follow.routes');
 
   router.use('/auth', authRoutes(container));
   router.use('/user', userRoutes(container));
@@ -58,6 +59,7 @@ const initializeRoutes = (container: unknown): Router => {
   );
 
   router.use('/', activityRoutes(container));
+  router.use('/', followRoutes(container));
 
   router.use('/search', searchRoutes(container));
   return router;
