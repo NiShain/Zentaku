@@ -13,6 +13,8 @@ import readingMediaLoader = require('./reading-media.loader');
 import streamingLoader = require('./streaming.loader');
 import searchLoader = require('./search.loader');
 import userLoader = require('./user.loader');
+import activityLoader = require('./activity.loader');
+import followLoader = require('./follow.loader');
 
 /**
  * Load all modules into the container
@@ -35,6 +37,10 @@ const loadModules = (container: Container): void => {
   streamingLoader(container);
 
   searchLoader(container);
+
+  activityLoader(container);
+
+  followLoader(container);
 
   logger.debug('[Loaders] All modules registered successfully');
   logger.debug(`[Loaders] Total registered: ${container.getRegistered().length} dependencies`);
