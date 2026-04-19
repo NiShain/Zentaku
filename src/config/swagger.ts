@@ -84,6 +84,141 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        ListPrivacyMode: {
+          type: 'string',
+          enum: ['PUBLIC', 'PRIVATE', 'SHARED'],
+          example: 'PUBLIC',
+        },
+        CreateListRequest: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: {
+              type: 'string',
+              maxLength: 255,
+              example: 'My Favorite Anime',
+            },
+            description: {
+              type: 'string',
+              maxLength: 5000,
+              example: 'A collection of my favorite anime series',
+            },
+            privacy: {
+              $ref: '#/components/schemas/ListPrivacyMode',
+            },
+            bannerImage: {
+              type: 'string',
+              format: 'uri',
+              example: 'https://example.com/banner.jpg',
+            },
+          },
+        },
+        UpdateListRequest: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              maxLength: 255,
+              example: 'Updated List Name',
+            },
+            description: {
+              type: 'string',
+              maxLength: 5000,
+              example: 'Updated description',
+            },
+            privacy: {
+              $ref: '#/components/schemas/ListPrivacyMode',
+            },
+            bannerImage: {
+              type: 'string',
+              format: 'uri',
+              example: 'https://example.com/banner.jpg',
+            },
+          },
+        },
+        ListSummary: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', example: 1 },
+            name: { type: 'string', example: 'My Favorite Anime' },
+            slug: { type: 'string', example: 'my-favorite-anime' },
+            description: { type: 'string', nullable: true, example: 'My top anime lists' },
+            privacy: { $ref: '#/components/schemas/ListPrivacyMode' },
+            ownerUsername: { type: 'string', example: 'john_doe' },
+            bannerImage: {
+              type: 'string',
+              nullable: true,
+              example: 'https://example.com/banner.jpg',
+            },
+            likeCount: { type: 'integer', example: 12 },
+            itemCount: { type: 'integer', example: 24 },
+          },
+        },
+        AnimeItemInList: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', example: 101 },
+            mediaId: { type: 'integer', example: 999 },
+            title: { type: 'string', example: 'Cowboy Bebop' },
+            poster: { type: 'string', nullable: true, example: 'https://example.com/poster.jpg' },
+            note: { type: 'string', nullable: true, example: 'Top 10 of all time' },
+            position: { type: 'integer', nullable: true, example: 1 },
+            addedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        ListDetail: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer', example: 1 },
+            name: { type: 'string', example: 'My Favorite Anime' },
+            slug: { type: 'string', example: 'my-favorite-anime' },
+            description: { type: 'string', nullable: true, example: 'My favorite shows' },
+            privacy: { $ref: '#/components/schemas/ListPrivacyMode' },
+            isOwner: { type: 'boolean', example: true },
+            ownerId: { type: 'integer', example: 10 },
+            ownerUsername: { type: 'string', example: 'john_doe' },
+            bannerImage: {
+              type: 'string',
+              nullable: true,
+              example: 'https://example.com/banner.jpg',
+            },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            likeCount: { type: 'integer', example: 12 },
+            likedByMe: { type: 'boolean', example: false },
+            animeItems: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/AnimeItemInList' },
+            },
+          },
+        },
+        ListRequestAction: {
+          type: 'string',
+          enum: ['ACCEPT', 'REJECT'],
+          example: 'ACCEPT',
+        },
+        ListRequestBody: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              maxLength: 500,
+              example: 'Please let me join this list',
+            },
+          },
+        },
+        RespondToRequestBody: {
+          type: 'object',
+          required: ['action'],
+          properties: {
+            action: { $ref: '#/components/schemas/ListRequestAction' },
+            message: {
+              type: 'string',
+              maxLength: 500,
+              example: 'Approved',
+            },
+          },
+        },
         PageInfo: {
           type: 'object',
           properties: {
@@ -768,6 +903,10 @@ const options: swaggerJsdoc.Options = {
       {
         name: 'Anime',
         description: 'Anime management and information endpoints',
+      },
+      {
+        name: 'List',
+        description: 'Custom list CRUD, requests, likes, and search endpoints',
       },
       {
         name: 'Streaming',
