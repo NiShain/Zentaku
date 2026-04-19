@@ -7,6 +7,7 @@ declare module 'express' {
   interface Request {
     user?: ITokenPayload;
     container?: typeof Container;
+    requestId?: string;
   }
 }
 

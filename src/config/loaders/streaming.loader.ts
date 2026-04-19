@@ -17,12 +17,12 @@ const loadStreaming = (container: any): void => {
     { singleton: true }
   );
 
-  //Load Aniwatch Client
+  //Load AniProvider Client
   container.register(
-    'aniwatchClient',
+    'aniProviderClient',
     () => {
-      const { AniwatchClient } = require('../../infrastructure/external/aniwatch');
-      return new AniwatchClient();
+      const { AniProviderClient } = require('../../infrastructure/external/aniprovider');
+      return new AniProviderClient();
     },
     { singleton: true }
   );
@@ -35,13 +35,13 @@ const loadStreaming = (container: any): void => {
       const animeRepository = c.resolve('animeRepository');
       const animeService = c.resolve('animeService');
       const malSyncClient = c.resolve('malSyncClient');
-      const aniwatchClient = c.resolve('aniwatchClient');
+      const aniProviderClient = c.resolve('aniProviderClient');
 
-      return new StreamingService(animeRepository, animeService, malSyncClient, aniwatchClient);
+      return new StreamingService(animeRepository, animeService, malSyncClient, aniProviderClient);
     },
     {
       singleton: true,
-      dependencies: ['animeRepository', 'animeService', 'malSyncClient', 'aniwatchClient'],
+      dependencies: ['animeRepository', 'animeService', 'malSyncClient', 'aniProviderClient'],
     }
   );
 

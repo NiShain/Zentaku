@@ -1,9 +1,19 @@
 import type { NextFunction, Request, Response } from 'express';
 import { param, query, validationResult } from 'express-validator';
-import {
-  AUDIO_CATEGORIES,
-  STREAMING_SERVERS,
-} from '../../infrastructure/external/aniwatch/aniwatch.types';
+
+const BOOLEAN_LIKE_TRUE_VALUES = new Set(['1', 'true', 'yes', 'y']);
+
+const parseBooleanLike = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  return BOOLEAN_LIKE_TRUE_VALUES.has(value.trim().toLowerCase());
+};
 
 const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
@@ -29,15 +39,9 @@ export const validateGetEpisodeSources = [
     .withMessage('Episode number must be a positive integer')
     .toInt(),
 
-  query('server')
-    .optional()
-    .isIn([...STREAMING_SERVERS])
-    .withMessage(`Invalid server. Must be one of: ${STREAMING_SERVERS.join(', ')}`),
+  query('refresh').optional({ nullable: true, checkFalsy: true }).customSanitizer(parseBooleanLike),
 
-  query('category')
-    .optional()
-    .isIn([...AUDIO_CATEGORIES])
-    .withMessage(`Invalid category. Must be one of: ${AUDIO_CATEGORIES.join(', ')}`),
+  query('async').optional({ nullable: true, checkFalsy: true }).customSanitizer(parseBooleanLike),
 
   handleValidationErrors,
 ];
@@ -56,19 +60,17 @@ export const validateGetEpisodes = [
   handleValidationErrors,
 ];
 
-export const validateGetEpisodeServers = [
+export const validateSyncHianimeId = [
   param('anilistId').isInt({ min: 1 }).withMessage('AniList ID must be a positive integer').toInt(),
-
-  param('episodeNumber')
-    .isInt({ min: 1 })
-    .withMessage('Episode number must be a positive integer')
-    .toInt(),
 
   handleValidationErrors,
 ];
 
-export const validateSyncHianimeId = [
-  param('anilistId').isInt({ min: 1 }).withMessage('AniList ID must be a positive integer').toInt(),
+export const validateGetTaskStatus = [
+  param('taskId')
+    .isString()
+    .matches(/^[a-zA-Z0-9-]{8,128}$/)
+    .withMessage('Task ID is invalid'),
 
   handleValidationErrors,
 ];
