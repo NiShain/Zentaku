@@ -39,8 +39,8 @@ const loadModules = (container: Container): void => {
 
   searchLoader(container);
 
-  activityLoader(container);
   listLoader(container);
+  activityLoader(container);
   followLoader(container);
 
   logger.debug('[Loaders] All modules registered successfully');
