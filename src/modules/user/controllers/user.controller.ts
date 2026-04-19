@@ -7,7 +7,6 @@ import {
 } from '../../../core/base/BaseController';
 import type { UpdatePreferencesDto, UpdatePrivacyDto, UpdateProfileDto } from '../dto/user.dto';
 import type { IUserService } from '../types/user.types';
-
 class UserController extends BaseController<IUserService & IBaseService> {
   constructor(userService: IUserService & IBaseService) {
     super(userService);
