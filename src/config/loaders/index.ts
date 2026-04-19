@@ -44,8 +44,6 @@ const loadModules = (container: Container): void => {
 
   followLoader(container);
 
-  listLoader(container);
-
   logger.debug('[Loaders] All modules registered successfully');
   logger.debug(`[Loaders] Total registered: ${container.getRegistered().length} dependencies`);
 };
