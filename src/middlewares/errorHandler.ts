@@ -1,7 +1,19 @@
 import type { NextFunction, Request, Response } from 'express';
-import multer from 'multer';
-import { AnilistAPIError, NotFoundError, ValidationError } from '../shared/utils/error';
+import {
+  AnilistAPIError,
+  AniProviderUpstreamError,
+  NotFoundError,
+  ValidationError,
+} from '../shared/utils/error';
 import logger from '../shared/utils/logger';
+
+interface MulterLikeError extends Error {
+  code?: string;
+}
+
+const isMulterLikeError = (error: Error): error is MulterLikeError => {
+  return error.name === 'MulterError';
+};
 
 /**
  * 404 handler
@@ -28,6 +40,20 @@ export const errorHandler = (
   });
 
   if ('isOperational' in err && err.isOperational) {
+    if (err instanceof AniProviderUpstreamError) {
+      res.status(err.statusCode).json({
+        success: false,
+        error: {
+          name: err.name,
+          message: err.message,
+          code: err.code,
+          ...(err.requestId && { request_id: err.requestId }),
+          ...(err.details && { details: err.details }),
+        },
+      });
+      return;
+    }
+
     res.status((err as unknown as { statusCode?: number }).statusCode || 500).json({
       success: false,
       error: {
@@ -61,7 +87,7 @@ export const errorHandler = (
     return;
   }
 
-  if (err instanceof multer.MulterError) {
+  if (isMulterLikeError(err)) {
     const message =
       err.code === 'LIMIT_FILE_SIZE'
         ? 'File is too large. Avatar must be < 2MB and banner must be < 5MB.'

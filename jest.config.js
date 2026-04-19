@@ -2,27 +2,26 @@ module.exports = {
   // Test environment
   testEnvironment: 'node',
 
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
+  },
+
   // Test file patterns
-  testMatch: [
-    '**/test/**/*.test.js',
-    '**/__tests__/**/*.js'
-  ],
+  testMatch: ['**/test/**/*.test.js', '**/__tests__/**/*.js'],
 
   // Reporters - output to console and file
   reporters: [
     'default',
-    ['./test/reporters/file-reporter.js', {
-      outputFile: 'test/test-results/test-output.log'
-    }]
+    [
+      './test/reporters/file-reporter.js',
+      {
+        outputFile: 'test/test-results/test-output.log',
+      },
+    ],
   ],
 
   // Coverage configuration
-  collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/generated/**',
-    '!**/node_modules/**',
-    '!**/test/**'
-  ],
+  collectCoverageFrom: ['src/**/*.js', '!src/generated/**', '!**/node_modules/**', '!**/test/**'],
 
   // Coverage thresholds
   coverageThreshold: {
@@ -30,8 +29,8 @@ module.exports = {
       branches: 50,
       functions: 50,
       lines: 50,
-      statements: 50
-    }
+      statements: 50,
+    },
   },
 
   // Verbose output
@@ -50,5 +49,5 @@ module.exports = {
   coverageDirectory: 'coverage',
 
   // Coverage reporters
-  coverageReporters: ['text', 'lcov', 'html']
+  coverageReporters: ['text', 'lcov', 'html'],
 };

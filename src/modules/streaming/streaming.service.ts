@@ -10,14 +10,18 @@
 import { BaseService } from '../../core/base/BaseService';
 import type { IStreamingService } from '../../core/interfaces/IStreamingService';
 import type {
-  AudioCategory,
   AvailableEpisodesResponse,
-  EpisodeServersResponse,
+  EpisodeInfo,
+  EpisodeSourcesData,
   EpisodeSourcesResponse,
-  StreamingServer,
+  StreamingTaskStatusResponse,
   SyncHianimeIdResponse,
 } from '../../core/types/streaming.types';
-import type AniwatchClient from '../../infrastructure/external/aniwatch/AniwatchClient';
+import type AniProviderClient from '../../infrastructure/external/aniprovider/AniProviderClient';
+import type {
+  AniProviderEpisodesResponse,
+  AniProviderSourcesSuccessResponse,
+} from '../../infrastructure/external/aniprovider/aniprovider.types';
 import type MalSyncClient from '../../infrastructure/external/malsync/MalSyncClient';
 import { NotFoundError, ValidationError } from '../../shared/utils/error';
 import type AnimeRepository from '../anime/anime.repository';
@@ -28,7 +32,7 @@ class StreamingService extends BaseService implements IStreamingService {
     private readonly animeRepository: AnimeRepository,
     private readonly animeService: AnimeService,
     private readonly malSyncClient: MalSyncClient,
-    private readonly aniwatchClient: AniwatchClient
+    private readonly aniProviderClient: AniProviderClient
   ) {
     super();
     this.logger.info('[StreamingService] Initialized');
@@ -103,8 +107,9 @@ class StreamingService extends BaseService implements IStreamingService {
   async getEpisodeSources(
     anilistId: number,
     episodeNumber: number,
-    server?: StreamingServer,
-    category?: AudioCategory
+    refresh?: boolean,
+    asyncMode?: boolean,
+    requestId?: string
   ): Promise<EpisodeSourcesResponse> {
     const validAnilistId = this._validateId(anilistId, 'AniList ID');
     const validEpisodeNumber = this._validateId(episodeNumber, 'Episode Number');
@@ -112,15 +117,18 @@ class StreamingService extends BaseService implements IStreamingService {
     this.logger.info(`[StreamingService] Getting episode sources:`, {
       anilistId: validAnilistId,
       episodeNumber: validEpisodeNumber,
-      server,
-      category,
+      refresh,
+      asyncMode,
+      requestId,
     });
 
     const hianimeId = await this._getOrSyncHianimeId(validAnilistId);
 
-    // Fetch all episodes (use high limit to get everything for finding specific episode)
-    const episodesData = await this.aniwatchClient.getAnimeEpisodes(hianimeId, 1, 10000);
-    const episode = episodesData.episodes.find((ep) => ep.number === validEpisodeNumber);
+    const episodesData = await this.aniProviderClient.getEpisodes(hianimeId, {
+      refresh,
+      requestId,
+    });
+    const episode = this._findEpisodeByNumber(episodesData, validEpisodeNumber);
 
     if (!episode) {
       throw new NotFoundError(
@@ -128,21 +136,31 @@ class StreamingService extends BaseService implements IStreamingService {
       );
     }
 
-    this.logger.debug(`[StreamingService] Found episodeId: ${episode.episodeId}`);
+    const sources = await this.aniProviderClient.getSources(episode.episodeId, {
+      refresh,
+      async: asyncMode,
+      requestId,
+    });
 
-    const sources = await this.aniwatchClient.getEpisodeSources(
-      episode.episodeId,
-      server,
-      category
-    );
-
-    this.logger.debug(`[StreamingService] Sources fetched successfully`);
+    if ('task_id' in sources) {
+      return {
+        anilistId: validAnilistId,
+        episodeNumber: validEpisodeNumber,
+        hianimeId,
+        status: 'pending',
+        task: {
+          taskId: sources.task_id,
+          status: sources.status,
+        },
+      };
+    }
 
     return {
-      ...sources,
       anilistId: validAnilistId,
       episodeNumber: validEpisodeNumber,
       hianimeId,
+      status: 'success',
+      data: this._mapSourcesSuccess(episode.episodeId, sources),
     };
   }
 
@@ -167,65 +185,47 @@ class StreamingService extends BaseService implements IStreamingService {
 
     const hianimeId = await this._getOrSyncHianimeId(validId);
 
-    const episodesData = await this.aniwatchClient.getAnimeEpisodes(hianimeId, page, limit);
+    const episodesData = await this.aniProviderClient.getEpisodes(hianimeId);
+    const allEpisodes = this._toEpisodeInfoList(episodesData.items);
 
-    this.logger.debug(
-      `[StreamingService] Found ${episodesData.episodes.length} episodes (page ${episodesData.pagination?.currentPage}/${episodesData.pagination?.totalPages})`
-    );
+    const normalizedPage = Math.max(1, page);
+    const normalizedLimit = Math.min(500, Math.max(1, limit));
+    const totalPages = Math.max(1, Math.ceil(allEpisodes.length / normalizedLimit));
+    const startIndex = (normalizedPage - 1) * normalizedLimit;
+    const pagedEpisodes = allEpisodes.slice(startIndex, startIndex + normalizedLimit);
+
+    this.logger.debug(`[StreamingService] Found ${pagedEpisodes.length} episodes from AniProvider`);
 
     return {
       anilistId: validId,
       hianimeId,
-      totalEpisodes: episodesData.totalEpisodes,
-      episodes: episodesData.episodes,
-      pagination: episodesData.pagination,
+      totalEpisodes: episodesData.total,
+      episodes: pagedEpisodes,
+      pagination: {
+        currentPage: normalizedPage,
+        totalPages,
+        pageSize: normalizedLimit,
+        totalItems: episodesData.total,
+        hasNextPage: normalizedPage < totalPages,
+        hasPreviousPage: normalizedPage > 1,
+      },
     };
   }
 
-  /**
-   * Get available servers for a specific episode
-   *
-   * @param anilistId - AniList anime ID
-   * @param episodeNumber - Episode number
-   * @returns Available servers for the episode
-   */
-  async getEpisodeServers(
-    anilistId: number,
-    episodeNumber: number
-  ): Promise<EpisodeServersResponse> {
-    const validAnilistId = this._validateId(anilistId, 'AniList ID');
-    const validEpisodeNumber = this._validateId(episodeNumber, 'Episode Number');
-
-    this.logger.info(`[StreamingService] Getting episode servers:`, {
-      anilistId: validAnilistId,
-      episodeNumber: validEpisodeNumber,
+  async getTaskStatus(taskId: string, requestId?: string): Promise<StreamingTaskStatusResponse> {
+    const normalizedTaskId = this._validateString(taskId, 'Task ID', {
+      minLength: 8,
+      maxLength: 128,
     });
 
-    const hianimeId = await this._getOrSyncHianimeId(validAnilistId);
-
-    // Get episodes list to find the real episodeId (use high limit to get all)
-    const episodesData = await this.aniwatchClient.getAnimeEpisodes(hianimeId, 1, 10000);
-    const episode = episodesData.episodes.find((ep) => ep.number === validEpisodeNumber);
-
-    if (!episode) {
-      throw new NotFoundError(
-        `Episode ${validEpisodeNumber} not found for anime ${validAnilistId}`
-      );
-    }
-
-    this.logger.debug(`[StreamingService] Found episodeId: ${episode.episodeId}`);
-
-    const servers = await this.aniwatchClient.getEpisodeServers(episode.episodeId);
-
-    this.logger.debug(
-      `[StreamingService] Found servers - sub: ${servers.sub.length}, dub: ${servers.dub.length}, raw: ${servers.raw.length}`
-    );
+    const taskResponse = await this.aniProviderClient.getTaskStatus(normalizedTaskId, requestId);
+    const mappedResult = this._mapTaskResult(taskResponse.result);
 
     return {
-      ...servers,
-      anilistId: validAnilistId,
-      episodeNumber: validEpisodeNumber,
-      hianimeId,
+      taskId: taskResponse.task_id,
+      status: taskResponse.status,
+      ...(mappedResult && { result: mappedResult }),
+      ...(taskResponse.error && { error: taskResponse.error }),
     };
   }
 
@@ -295,6 +295,96 @@ class StreamingService extends BaseService implements IStreamingService {
     }
 
     this.logger.debug(`[StreamingService] HiAnime ID validated: ${hianimeId}`);
+  }
+
+  private _findEpisodeByNumber(
+    response: AniProviderEpisodesResponse,
+    episodeNumber: number
+  ): EpisodeInfo | undefined {
+    return this._toEpisodeInfoList(response.items).find(
+      (episode) => episode.number === episodeNumber
+    );
+  }
+
+  private _toEpisodeInfoList(items: AniProviderEpisodesResponse['items']): EpisodeInfo[] {
+    return items.map((item) => ({
+      number: item.order,
+      order: item.order,
+      title: item.title,
+      episodeId: item.episode_id,
+      episodeUrl: item.episode_url,
+    }));
+  }
+
+  private _mapSourcesSuccess(
+    upstreamEpisodeId: string,
+    sources: AniProviderSourcesSuccessResponse
+  ): EpisodeSourcesData {
+    return {
+      streamLinks: sources.stream_links,
+      subtitles: sources.vtt_links.map((url) => ({
+        url,
+        lang: this._detectSubtitleLanguage(url),
+      })),
+      capturedAt: sources.captured_at,
+      upstreamEpisodeId,
+      meta: {
+        refreshed: sources.meta.refreshed,
+        source: sources.meta.source,
+      },
+    };
+  }
+
+  private _mapTaskResult(result: unknown): EpisodeSourcesData | undefined {
+    if (!result || typeof result !== 'object') {
+      return undefined;
+    }
+
+    const payload = result as Record<string, unknown>;
+    const streamLinks = Array.isArray(payload.stream_links)
+      ? payload.stream_links.filter((item): item is string => typeof item === 'string')
+      : [];
+    const vttLinks = Array.isArray(payload.vtt_links)
+      ? payload.vtt_links.filter((item): item is string => typeof item === 'string')
+      : [];
+    const capturedAt = typeof payload.captured_at === 'string' ? payload.captured_at : undefined;
+    const episodeId = typeof payload.episode_id === 'string' ? payload.episode_id : undefined;
+    const metaObj =
+      payload.meta && typeof payload.meta === 'object'
+        ? (payload.meta as Record<string, unknown>)
+        : null;
+
+    if (!capturedAt || !episodeId || !metaObj) {
+      return undefined;
+    }
+
+    return {
+      streamLinks,
+      subtitles: vttLinks.map((url) => ({
+        url,
+        lang: this._detectSubtitleLanguage(url),
+      })),
+      capturedAt,
+      upstreamEpisodeId: episodeId,
+      meta: {
+        refreshed: Boolean(metaObj.refreshed),
+        source: typeof metaObj.source === 'string' ? metaObj.source : 'rapidcloud_capture_async',
+      },
+    };
+  }
+
+  private _detectSubtitleLanguage(url: string): string {
+    const normalized = url.toLowerCase();
+
+    if (normalized.includes('.vi.') || normalized.includes('/vi.') || normalized.includes('-vi.')) {
+      return 'vi';
+    }
+
+    if (normalized.includes('.en.') || normalized.includes('/en.') || normalized.includes('-en.')) {
+      return 'en';
+    }
+
+    return 'unknown';
   }
 }
 

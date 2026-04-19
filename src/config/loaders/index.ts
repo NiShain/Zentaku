@@ -14,6 +14,8 @@ import streamingLoader = require('./streaming.loader');
 import searchLoader = require('./search.loader');
 import userLoader = require('./user.loader');
 import listLoader = require('./list.loader');
+import activityLoader = require('./activity.loader');
+import followLoader = require('./follow.loader');
 
 /**
  * Load all modules into the container
@@ -36,6 +38,11 @@ const loadModules = (container: Container): void => {
   streamingLoader(container);
 
   searchLoader(container);
+
+  listLoader(container);
+  activityLoader(container);
+
+  followLoader(container);
 
   listLoader(container);
 
