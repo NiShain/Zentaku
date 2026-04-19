@@ -15,6 +15,7 @@ const initializeRoutes = (container: unknown): Router => {
   const streamingRoutes = require('../modules/streaming/streaming.routes');
   const searchRoutes = require('../modules/search/search.routes');
   const userRoutes = require('../modules/user/user.routes');
+  const listRoutes = require('../modules/list/list.routes');
 
   router.use('/auth', authRoutes(container));
   router.use('/user', userRoutes(container));
@@ -22,6 +23,7 @@ const initializeRoutes = (container: unknown): Router => {
   router.use('/anilist', readingMediaRoutes(container));
   router.use('/streaming', streamingRoutes(container));
   router.use('/search', searchRoutes(container));
+  router.use('/list', listRoutes(container));
   return router;
 };
 
